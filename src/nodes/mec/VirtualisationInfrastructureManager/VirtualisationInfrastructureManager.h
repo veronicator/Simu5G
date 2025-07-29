@@ -88,6 +88,9 @@ class VirtualisationInfrastructureManager : public cSimpleModule
     int mp1Port_;
 
     //------------------------------------
+    bool isMobile = false;
+
+    //------------------------------------
     //parameters to control the number of MEC APPs instantiated and to set gate sizes
     int maxMECApps;
     int currentMEApps = 0;

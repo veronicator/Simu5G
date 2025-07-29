@@ -35,6 +35,10 @@ void VirtualisationInfrastructureManager::initialize(int stage)
 
     //------------------------------------
     mecHost = getParentModule();
+
+    if (mecHost->hasPar("isMobile"))
+        isMobile = mecHost->par("isMobile").boolValue();
+
     if (mecHost->hasPar("maxMECApps"))
         maxMECApps = mecHost->par("maxMECApps");
     else
@@ -63,22 +67,37 @@ void VirtualisationInfrastructureManager::initialize(int stage)
         scheduling = SEGREGATION;
     }
 
-    virtualisationInfr = mecHost->getSubmodule("virtualisationInfrastructure");
-    if (virtualisationInfr == nullptr)
-        throw cRuntimeError("VirtualisationInfrastructureManager::initialize - mecHost.maxMECApps parameter!");
+    if (isMobile) {
+        // register MEC addresses to the Binder
+        inet::L3Address mecHostAddress = inet::L3AddressResolver().resolve(mecHost->getFullPath().c_str());
+//        inet::L3Address gtpAddress = inet::L3AddressResolver().resolve(mecHost->getSubmodule("upf_mec")->getFullPath().c_str());
+//        binder_->registerMecHostUpfAddress(mecHostAddress, gtpAddress);
+        binder_->registerMecHost(mecHostAddress);
 
-    // register MEC addresses to the Binder
-    inet::L3Address mecHostAddress = inet::L3AddressResolver().resolve(virtualisationInfr->getFullPath().c_str());
-    inet::L3Address gtpAddress = inet::L3AddressResolver().resolve(mecHost->getSubmodule("upf_mec")->getFullPath().c_str());
-    binder_->registerMecHostUpfAddress(mecHostAddress, gtpAddress);
-    binder_->registerMecHost(mecHostAddress);
+//        mecHost->setGateSize("meAppOut", maxMECApps);
+//        mecHost->setGateSize("meAppIn", maxMECApps);
 
-    virtualisationInfr->setGateSize("meAppOut", maxMECApps);
-    virtualisationInfr->setGateSize("meAppIn", maxMECApps);
+        mp1Address_ = mecHostAddress.toIpv4();
+    } else {
+        virtualisationInfr = mecHost->getSubmodule("virtualisationInfrastructure");
+        if (virtualisationInfr == nullptr)
+            throw cRuntimeError("VirtualisationInfrastructureManager::initialize - mecHost.maxMECApps parameter!");
+
+        // register MEC addresses to the Binder
+        inet::L3Address mecHostAddress = inet::L3AddressResolver().resolve(virtualisationInfr->getFullPath().c_str());
+        inet::L3Address gtpAddress = inet::L3AddressResolver().resolve(mecHost->getSubmodule("upf_mec")->getFullPath().c_str());
+        binder_->registerMecHostUpfAddress(mecHostAddress, gtpAddress);
+        binder_->registerMecHost(mecHostAddress);
+
+        virtualisationInfr->setGateSize("meAppOut", maxMECApps);
+        virtualisationInfr->setGateSize("meAppIn", maxMECApps);
+
+        mp1Address_ = mecHostAddress.toIpv4();
+    }
 
     mecPlatform = mecHost->getSubmodule("mecPlatform");
 
-    mp1Address_ = mecHostAddress.toIpv4();
+//    mp1Address_ = mecHostAddress.toIpv4();
     mp1Port_ = par("mp1Port");
 
     //------------------------------------
@@ -86,7 +105,10 @@ void VirtualisationInfrastructureManager::initialize(int stage)
     for (int i = 0; i < maxMECApps; i++)
         freeGates.push_back(i);
     //------------------------------------
-    interfaceTable = check_and_cast<inet::InterfaceTable *>(virtualisationInfr->getSubmodule("interfaceTable"));
+    if (isMobile)
+        interfaceTable = check_and_cast<inet::InterfaceTable *>(mecHost->getSubmodule("interfaceTable"));
+    else
+        interfaceTable = check_and_cast<inet::InterfaceTable *>(virtualisationInfr->getSubmodule("interfaceTable"));
 
     /*
      * NOTE: if the mecHost is connected both to ppp and pppENB gates, 2 pppIf interfaces are present in the
@@ -94,7 +116,8 @@ void VirtualisationInfrastructureManager::initialize(int stage)
      */
     int numInterfaces = interfaceTable->getNumInterfaces();
     for (int i = 0; i < numInterfaces; ++i) {
-        if (strcmp("pppIf0", interfaceTable->getInterface(i)->getInterfaceName()) == 0) {
+        if (strcmp("pppIf0", interfaceTable->getInterface(i)->getInterfaceName()) == 0 ||
+                strcmp("cellular", interfaceTable->getInterface(i)->getInterfaceName()) == 0) {
             mecAppRemoteAddress_ = interfaceTable->getInterface(i)->getIpv4Address();
         }
         else if (strcmp("eth", interfaceTable->getInterface(i)->getInterfaceName()) == 0) {
@@ -264,23 +287,37 @@ MecAppInstanceInfo *VirtualisationInfrastructureManager::instantiateMEApp(Create
 
         mecAppPortCounter++;
 
+        if (isMobile) {
+            //connecting MobileHostNode gates to MEApp gates*
+            cModule *at = mecHost->getSubmodule("at");
+            if (at == nullptr)
+                throw cRuntimeError("at module, i.e. message dispatcher for SAP between application and transport layer not found");
 
-        //connecting VirtualisationInfrastructure gates to the MEApp gates
+            cGate *newAtInGate = at->getOrCreateFirstUnconnectedGate("in", 0, false, true);
+            cGate *newAtOutGate = at->getOrCreateFirstUnconnectedGate("out", 0, false, true);
+//
+            newAtOutGate->connectTo(module->gate("socketIn"));
 
-        // add gates to the 'at' layer and connect them to the virtualisationInfr gates
-        cModule *at = virtualisationInfr->getSubmodule("at");
-        if (at == nullptr)
-            throw cRuntimeError("at module, i.e. message dispatcher for SAP between application and transport layer not found");
+            // connect gates to the meApp
+            module->gate("socketOut")->connectTo(newAtInGate);
+        } else {
+            //connecting VirtualisationInfrastructure gates to the MEApp gates
 
-        cGate *newAtInGate = at->getOrCreateFirstUnconnectedGate("in", 0, false, true);
-        cGate *newAtOutGate = at->getOrCreateFirstUnconnectedGate("out", 0, false, true);
+            // add gates to the 'at' layer and connect them to the virtualisationInfr gates
+            cModule *at = virtualisationInfr->getSubmodule("at");
+            if (at == nullptr)
+                throw cRuntimeError("at module, i.e. message dispatcher for SAP between application and transport layer not found");
 
-        newAtOutGate->connectTo(virtualisationInfr->gate("meAppOut", index));
-        virtualisationInfr->gate("meAppOut", index)->connectTo(module->gate("socketIn"));
+            cGate *newAtInGate = at->getOrCreateFirstUnconnectedGate("in", 0, false, true);
+            cGate *newAtOutGate = at->getOrCreateFirstUnconnectedGate("out", 0, false, true);
 
-        // connect virtualisationInfr gates to the meApp
-        virtualisationInfr->gate("meAppIn", index)->connectTo(newAtInGate);
-        module->gate("socketOut")->connectTo(virtualisationInfr->gate("meAppIn", index));
+            newAtOutGate->connectTo(virtualisationInfr->gate("meAppOut", index));
+            virtualisationInfr->gate("meAppOut", index)->connectTo(module->gate("socketIn"));
+
+            // connect virtualisationInfr gates to the meApp
+            virtualisationInfr->gate("meAppIn", index)->connectTo(newAtInGate);
+            module->gate("socketOut")->connectTo(virtualisationInfr->gate("meAppIn", index));
+        }
 
         /*
          * @author Alessandro Noferi
@@ -375,10 +412,20 @@ bool VirtualisationInfrastructureManager::terminateMEApp(DeleteAppMessage *msg)
         int index = mecAppMap[key].meAppGateIndex;
         int serviceIndex = mecAppMap[key].serviceIndex;
 
-        // TODO manage gates me app to at
+        if (isMobile) {
+            cModule *at = mecHost->getSubmodule("at");
+            if (at == nullptr)
+                throw cRuntimeError("at module, i.e. message dispatcher for SAP between application and transport layer not found");
 
-        virtualisationInfr->gate("meAppOut", index)->getPreviousGate()->disconnect();
-        virtualisationInfr->gate("meAppIn", index)->disconnect();
+            at->gate("socketOut", index)->getPreviousGate()->disconnect();
+            at->gate("socketIn", index)->disconnect();
+
+        } else {
+            // TODO manage gates me app to at
+
+            virtualisationInfr->gate("meAppOut", index)->getPreviousGate()->disconnect();
+            virtualisationInfr->gate("meAppIn", index)->disconnect();
+        }
 
         if (serviceIndex >= 0) {
             //disconnecting internal MEPlatform gates to the MEService gates

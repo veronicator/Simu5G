@@ -70,9 +70,13 @@ void TrafficFlowFilter::initialize(int stage)
 
         meHost = getParentModule()->par("mecHost").stringValue();
         if (isBaseStation(ownerType_) && !meHost.empty()) {
-            std::stringstream meHostName;
-            meHostName << meHost << ".virtualisationInfrastructure";
-            meHost = meHostName.str();
+            if (getParentModule()->hasPar("isMobile")) {
+                if (!getParentModule()->par("isMobile").boolValue()) {
+                    std::stringstream meHostName;
+                    meHostName << meHost << ".virtualisationInfrastructure";
+                    meHost = meHostName.str();
+                }
+            }
             meHostAddress = inet::L3AddressResolver().resolve(meHost.c_str());
 
             EV << "TrafficFlowFilter::initialize - meHost: " << meHost << " meHostAddress: " << meHostAddress.str() << endl;

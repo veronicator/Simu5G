@@ -20,7 +20,7 @@ import simu5g.nodes.NR.NRUe;
 import simu5g.nodes.NR.gNodeB;
 import simu5g.nodes.Upf;
 import simu5g.nodes.mec.MECHost;
-import simu5g.nodes.mec.MobileMECHost;
+import simu5g.nodes.mec.MobileHostNode;
 import simu5g.nodes.mec.MECOrchestrator.MecOrchestrator;
 import simu5g.nodes.mec.UALCMP.UALCMP;
 import simu5g.world.radio.LteChannelControl;
@@ -67,14 +67,9 @@ network mobileMecHostNet
             @display("p=237,310");
         }
         //# MEC module
-        mecHost: MobileMECHost {
+        mecHost: MobileHostNode {
             @display("p=352,145;is=l");
         }
-
-//        //# Mobile MEC module
-//        mobileMecHost: MobileMECHost {
-//            @display("p=414,384");
-//        }
 
         mecOrchestrator: MecOrchestrator {
             @display("p=544,63;is=l");
@@ -94,5 +89,4 @@ network mobileMecHostNet
         ualcmp.toMecOrchestrator --> mecOrchestrator.fromUALCMP;
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
 
-//        mecHost.ppp++ <--> Eth10G <--> iUpf.pppg++;
 }
