@@ -168,5 +168,5 @@ module MobileMECHost
 //        cellularNic.upperLayerOut --> virtualisationInfrastructure.nicIn;
 //        cellularNic.upperLayerIn <-- virtualisationInfrastructure.nicOut;
 //
-        virtualisationInfrastructure.nrRadioIn <-- nrRadioIn;
+//        virtualisationInfrastructure.nrRadioIn <-- nrRadioIn;
 }
