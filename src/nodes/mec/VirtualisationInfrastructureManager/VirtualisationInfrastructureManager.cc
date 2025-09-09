@@ -70,12 +70,8 @@ void VirtualisationInfrastructureManager::initialize(int stage)
     if (isMobile) {
         // register MEC addresses to the Binder
         inet::L3Address mecHostAddress = inet::L3AddressResolver().resolve(mecHost->getFullPath().c_str());
-//        inet::L3Address gtpAddress = inet::L3AddressResolver().resolve(mecHost->getSubmodule("upf_mec")->getFullPath().c_str());
-//        binder_->registerMecHostUpfAddress(mecHostAddress, gtpAddress);
         binder_->registerMecHost(mecHostAddress);
 
-//        mecHost->setGateSize("meAppOut", maxMECApps);
-//        mecHost->setGateSize("meAppIn", maxMECApps);
 
         mp1Address_ = mecHostAddress.toIpv4();
     } else {
@@ -299,6 +295,8 @@ MecAppInstanceInfo *VirtualisationInfrastructureManager::instantiateMEApp(Create
 
             // connect gates to the meApp
             module->gate("socketOut")->connectTo(newAtInGate);
+
+            mecAppMap[key].meAppGateIndex = newAtInGate->getIndex();
         } else {
             //connecting VirtualisationInfrastructure gates to the MEApp gates
 
@@ -416,8 +414,9 @@ bool VirtualisationInfrastructureManager::terminateMEApp(DeleteAppMessage *msg)
             if (at == nullptr)
                 throw cRuntimeError("at module, i.e. message dispatcher for SAP between application and transport layer not found");
 
-            at->gate("socketOut", index)->getPreviousGate()->disconnect();
-            at->gate("socketIn", index)->disconnect();
+            // todo check if necessary
+            at->gate("out", index)->disconnect();
+            at->gate("in", index)->disconnect();
 
         } else {
             // TODO manage gates me app to at
