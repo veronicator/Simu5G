@@ -40,7 +40,7 @@ simple UERequestApp like IApp
         double startTime @unit("s") = default(0s);
         double stopTime @unit("s") = default(120s);
 
-        string mecAppName = default("MecResponseApp");
+        string mecAppName = default("MECResponseApp");
 
         // stats
 

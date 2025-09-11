@@ -25,10 +25,12 @@ import simu5g.apps.mec.MecApps.MecAppBase;
 simple MECResponseApp extends MecAppBase
 {
     parameters:
-        @class(MecResponseApp);
+        @class(MECResponseApp);
         @display("i=block/app;is=s");
 
         int responsePacketSize @unit(B) = default(50B);
+
+        int localUePort;
 
         int minInstructions = default(9000000);
         int maxInstructions = default(11000000);
