@@ -3,15 +3,15 @@
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Lesser General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see http://www.gnu.org/licenses/.
-// 
+//
 
 package simu5g.nodes.mec;
 
@@ -27,6 +27,7 @@ import inet.networklayer.contract.INetworkLayer;
 import inet.transportlayer.contract.ISctp;
 import inet.transportlayer.contract.ITcp;
 import inet.transportlayer.contract.IUdp;
+import simu5g.corenetwork.statsCollector.NRueStatsCollector;
 import simu5g.corenetwork.statsCollector.UeStatsCollector;
 import simu5g.stack.ICellularNic;
 import simu5g.nodes.mec.MECPlatform.MECPlatform;
@@ -115,7 +116,7 @@ module MobileHostNode
     gates:
         input radioIn @directIn;     // connection to master
         input nrRadioIn @directIn;
-        
+
 		 //from MecHost
 //        //to local radio networks
 //        inout ppp[];
@@ -236,6 +237,10 @@ module MobileHostNode
         //# UeStatsCollector - for MEC
         ueCollector: UeStatsCollector if hasRNISupport {
             @display("p=126,588;is=s");
+        }
+        //# NR UeStatsCollector - for MEC
+        NRueCollector: NRueStatsCollector if hasRNISupport {
+            @display("p=127,506;is=s");
         }
 
     connections allowunconnected:
