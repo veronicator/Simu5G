@@ -58,7 +58,7 @@ network mobileMecHostNet
             @display("p=545,250");
         }
         iUpf: Upf {
-            @display("p=352,250");
+            @display("p=481,249");
         }
         gNodeB1: gNodeB {
             @display("p=140,250;is=vl");
