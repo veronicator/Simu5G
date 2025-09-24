@@ -94,7 +94,7 @@ network DynamicMobileMecHost
         mecHost3: MECHost {
             @display("p=698,247");
         }
-        mecHostMobile: MobileHostNode {
+        mobileMecHost: MobileHostNode {
             @display("p=197,518");
         }
         mecOrchestrator: MecOrchestrator {
