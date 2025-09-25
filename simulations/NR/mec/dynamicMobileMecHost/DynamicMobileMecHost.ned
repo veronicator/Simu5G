@@ -39,7 +39,7 @@ network DynamicMobileMecHost
         double routersDelay @unit(m) = default(0m);
 //        volatile double routersDelay @unit(m) = default(normal(2m, 0.8m));
 
-        @display("i=block/network2;bgb=1088,678;");
+        @display("i=block/network2;bgb=1588,1078;");
     submodules:
         channelControl: LteChannelControl {
             @display("p=50,25;is=s");
@@ -57,51 +57,51 @@ network DynamicMobileMecHost
             @display("p=50,258;is=s");
         }
         upf: Upf {
-            @display("p=590,125");
+            @display("p=685,116");
         }
         iUpf1: Upf {
-            @display("p=400,247");
+            @display("p=495,238");
         }
         iUpf2: Upf {
-            @display("p=590,247");
+            @display("p=685,238");
         }
         iUpf3: Upf {
-            @display("p=797,247");
+            @display("p=891,238");
         }
         gnb1: gNodeB {
-            @display("p=191,384;is=vl");
+            @display("p=285,375;is=vl");
         }
         gnb2: gNodeB {
-            @display("p=590,404;is=vl");
+            @display("p=685,394;is=vl");
         }
         gnb3: gNodeB {
-            @display("p=1017,391;is=vl");
+            @display("p=1112,382;is=vl");
         }
         bgCell[numBgCells]: BackgroundCell {
             @display("p=80,576;is=vl");
         }
         ue[numUe]: NRUe {
-            @display("p=95,421");
+            @display("p=291,624");
         }
 
         //# MEC modules
         mecHost1: MECHost {
-            @display("p=248,247");
+            @display("p=343,238");
         }
         mecHost2: MECHost {
-            @display("p=495,247");
+            @display("p=590,238");
         }
         mecHost3: MECHost {
-            @display("p=698,247");
+            @display("p=793,238");
         }
         mobileMecHost: MobileHostNode {
-            @display("p=197,518");
+            @display("p=251,511");
         }
         mecOrchestrator: MecOrchestrator {
-            @display("p=741,44");
+            @display("p=835,35");
         }
         ualcmp: UALCMP {
-            @display("p=590,44");
+            @display("p=685,35");
         }
 
     connections:
