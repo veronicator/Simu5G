@@ -41,7 +41,7 @@ module MobileHostNode
 {
     parameters:
         @networkNode();
-        @display("i=device/pocketpc;bgb=1219,700");
+        @display("i=device/device;bgb=1219,700");
         @figure[applicationLayer](type=rectangle; pos=250,6; size=600,130; lineColor=#808080; cornerRadius=5; fillColor=#ffff00; fillOpacity=0.1);
         @figure[applicationLayer.title](type=text; pos=845,11; anchor=ne; text="application layer");
         @figure[transportLayer](type=rectangle; pos=250,156; size=600,130; fillColor=#ff0000; lineColor=#808080; cornerRadius=5; fillOpacity=0.1);
