@@ -19,6 +19,7 @@ import simu5g.common.carrierAggregation.CarrierAggregation;
 import simu5g.nodes.NR.NRUe;
 import simu5g.nodes.NR.gNodeB;
 import simu5g.nodes.Upf;
+import simu5g.nodes.backgroundCell.BackgroundCell;
 import simu5g.nodes.mec.MECHost;
 import simu5g.nodes.mec.MobileHostNode;
 import simu5g.nodes.mec.MECOrchestrator.MecOrchestrator;
@@ -29,9 +30,10 @@ import simu5g.world.radio.LteChannelControl;
 network mobileMecHostNet
 {
     parameters:
-        @display("i=block/network2;bgb=811,507;bgi=background/pisa");
+        @display("i=block/network2;bgb=1500,1000;bgi=background/pisa");
 
         int numUes = default(0);
+        int numBgCells = default(0);
 
         double playgroundSizeX @unit(m); // x size of the area the nodes are in (in meters)
         double playgroundSizeY @unit(m); // y size of the area the nodes are in (in meters)
@@ -40,19 +42,19 @@ network mobileMecHostNet
     submodules:
 
         routingRecorder: RoutingTableRecorder {
-            @display("p=690,104;is=s");
+            @display("p=53,81;is=s");
         }
         configurator: Ipv4NetworkConfigurator {
-            @display("p=690,184;is=s");
+            @display("p=52,136;is=s");
         }
         channelControl: LteChannelControl {
-            @display("p=690,24;is=s");
+            @display("p=54,30;is=s");
         }
         binder: Binder {
-            @display("p=690,264;is=s");
+            @display("p=52,192;is=s");
         }
         carrierAggregation: CarrierAggregation {
-            @display("p=691,342;is=s");
+            @display("p=51,248;is=s");
         }
         upf: Upf {
             @display("p=545,250");
@@ -61,7 +63,10 @@ network mobileMecHostNet
             @display("p=481,249");
         }
         gNodeB1: gNodeB {
-            @display("p=140,250;is=vl");
+            @display("p=352,249;is=vl");
+        }
+        bgCell[numBgCells]: BackgroundCell {
+            @display("p=251,439;is=vl");
         }
         ue[numUes]: NRUe {
             @display("p=237,310");
