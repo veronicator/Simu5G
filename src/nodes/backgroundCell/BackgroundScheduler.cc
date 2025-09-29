@@ -52,12 +52,6 @@ void BackgroundScheduler::initialize(int stage)
         ulPrevBandAllocation_.resize(numBands_, NODEID_NONE);
         ulBandAllocation_.resize(numBands_, NODEID_NONE);
 
-        // TODO: if BackgroundScheduler interference is disabled, do not send selfMessages
-        // Start TTI tick
-        ttiTick_ = new cMessage("ttiTick_");
-        ttiTick_->setSchedulingPriority(1);        // TTI TICK after other messages
-        ttiPeriod_ = binder_->getSlotDurationFromNumerologyIndex(numerologyIndex_);
-        scheduleAt(NOW + ttiPeriod_, ttiTick_);
 
         // register to get a notification when position changes
         getParentModule()->subscribe(inet::IMobility::mobilityStateChangedSignal, this);
@@ -73,6 +67,13 @@ void BackgroundScheduler::initialize(int stage)
 
         bgChannelModel_.reference(this, "channelModelModule", true);
         bgChannelModel_->setCarrierFrequency(carrierFrequency_);
+
+        // TODO: if BackgroundScheduler interference is disabled, do not send selfMessages
+        // Start TTI tick
+        ttiTick_ = new cMessage("ttiTick_");
+        ttiTick_->setSchedulingPriority(1);        // TTI TICK after other messages
+        ttiPeriod_ = binder_->getSlotDurationFromNumerologyIndex(numerologyIndex_);
+        scheduleAt(NOW + ttiPeriod_, ttiTick_);
     }
 }
 
