@@ -29,6 +29,6 @@ module gNodeB extends eNodeB
         gateway = default("upf"); // change this path if the gateway node is inside a compound module
         nodeType = "GNODEB";        // DO NOT CHANGE
         cellularNic.typename = default("NRNicEnb");
-        
-        bool isMobile = default(false);
+
+//        bool isMobile = default(false);
 }
