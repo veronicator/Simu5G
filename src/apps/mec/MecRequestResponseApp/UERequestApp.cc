@@ -113,7 +113,16 @@ void UERequestApp::handleMessage(cMessage *msg)
     }
     // Receiver Side
     else {
-        inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
+        inet::Packet *packet = nullptr;
+        try {
+//            inet::Packet *
+            packet = check_and_cast<inet::Packet *>(msg);
+        } catch (const cRuntimeError& err) {
+            EV << "received uncastable msg with name " << msg->getName()
+                    << " of class " << msg->getClassName() << endl;
+            delete msg;
+            return;
+        }
         inet::L3Address ipAdd = packet->getTag<L3AddressInd>()->getSrcAddress();
 
         /*
