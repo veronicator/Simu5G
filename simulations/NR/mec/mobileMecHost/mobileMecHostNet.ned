@@ -42,46 +42,46 @@ network mobileMecHostNet
     submodules:
 
         routingRecorder: RoutingTableRecorder {
-            @display("p=53,81;is=s");
+            @display("p=137,149;is=s");
         }
         configurator: Ipv4NetworkConfigurator {
-            @display("p=52,136;is=s");
+            @display("p=137,255;is=s");
         }
         channelControl: LteChannelControl {
-            @display("p=54,30;is=s");
+            @display("p=135,58;is=s");
         }
         binder: Binder {
-            @display("p=52,192;is=s");
+            @display("p=137,359;is=s");
         }
         carrierAggregation: CarrierAggregation {
-            @display("p=51,248;is=s");
+            @display("p=137,446;is=s");
         }
         upf: Upf {
-            @display("p=545,250");
+            @display("p=924,462");
         }
         iUpf: Upf {
-            @display("p=481,249");
+            @display("p=741,462");
         }
         gNodeB1: gNodeB {
-            @display("p=352,249;is=vl");
+            @display("p=500,462;is=vl");
         }
         bgCell[numBgCells]: BackgroundCell {
-            @display("p=251,439;is=vl");
+            @display("p=265,695;is=vl");
         }
         ue[numUes]: NRUe {
-            @display("p=237,310");
+            @display("p=341,357");
         }
         //# MEC module
         mecHost: MobileHostNode {
-            @display("p=352,145;is=l");
+            @display("p=488,193;is=l");
         }
 
         mecOrchestrator: MecOrchestrator {
-            @display("p=544,63;is=l");
+            @display("p=924,114;is=l");
         }
 
         ualcmp: UALCMP {
-            @display("p=545,158;i=device/smallrouter");
+            @display("p=924,295;i=device/smallrouter");
         }
 
 
