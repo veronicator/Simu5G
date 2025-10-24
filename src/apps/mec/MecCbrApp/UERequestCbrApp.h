@@ -81,16 +81,16 @@ class UERequestCbrApp : public cSimpleModule
     void handleMessage(cMessage *msg) override;
     void finish() override;
 
-    void emitStats();
+    void emitStats();   // not defined
 
     // --- Functions to interact with the DeviceApp --- //
-    void sendStartMECRequestApp();
-    void sendStopMECRequestApp();
+    void sendStartMECRequestCbrApp();
+    void sendStopMECRequestCbrApp();
     void handleStopApp(cMessage *msg);
     void sendStopApp();
 
-    void handleAckStartMECRequestApp(cMessage *msg);
-    void handleAckStopMECRequestApp(cMessage *msg);
+    void handleAckStartMECRequestCbrApp(cMessage *msg);
+    void handleAckStopMECRequestCbrApp(cMessage *msg);
 
     // --- Functions to interact with the MECPlatooningApp --- //
     void sendRequest();
