@@ -40,10 +40,11 @@ class MECResponseCbrApp : public MecAppBase
 
     HttpBaseMessage *mp1HttpMessage = nullptr;
 
-//    std::vector<cMessage *> arrivedRequestMsg;
-    cMessage *currentRequestfMsg_ = nullptr;
+    cQueue requestPktQueue_;
+    cMessage *requestMsg_ = nullptr;
+    cMessage *currentRequestMsg_ = nullptr;
     cMessage *processingTimer_ = nullptr;
-    simtime_t msgArrived_;
+//    simtime_t msgArrived_;
     simtime_t getRequestSent_;
     simtime_t getRequestArrived_;
     double processingTime_;
@@ -65,6 +66,7 @@ class MECResponseCbrApp : public MecAppBase
 
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }
     void initialize(int stage) override;
+//    void handleMessage(cMessage *msg) override;
     void handleProcessedMessage(cMessage *msg) override;
     void finish() override;
     void handleSelfMessage(cMessage *msg) override;

@@ -32,7 +32,8 @@ using namespace omnetpp;
 
 MECResponseCbrApp::~MECResponseCbrApp()
 {
-    delete currentRequestfMsg_;
+    delete currentRequestMsg_;
+    cancelAndDelete(requestMsg_);
     cancelAndDelete(processingTimer_);
 }
 
@@ -52,6 +53,7 @@ void MECResponseCbrApp::initialize(int stage)
 
     packetSize_ = B(par("responsePacketSize"));
 
+    requestMsg_ = new cMessage("requestMsg");
     processingTimer_ = new cMessage("computeMsg");
 
     minInstructions_ = par("minInstructions");
@@ -63,6 +65,18 @@ void MECResponseCbrApp::initialize(int stage)
 
     connect(mp1Socket_, mp1Address, mp1Port);
 }
+
+
+//void MECResponseCbrApp::handleMessage(cMessage *msg)
+//{
+//    if (msg->isSelfMessage()) {
+//        //todo gestire la coda in qualche modo
+//        handleRequest(msg);
+//    }
+//    else {
+//        MecAppBase::handleMessage(msg);
+//    }
+//}
 
 void MECResponseCbrApp::handleProcessedMessage(cMessage *msg)
 {
@@ -99,7 +113,12 @@ double MECResponseCbrApp::scheduleNextMsg(cMessage *msg)
 void MECResponseCbrApp::handleSelfMessage(cMessage *msg)
 {
     if (!strcmp(msg->getName(), "computeMsg")) {
+        EV << "MECResponseCbrApp::handleSelfMessage - computeMsg" << endl;
         sendResponse();
+    }
+    else if (!strcmp(msg->getName(), "requestMsg")) {
+        EV << "MECResponseCbrApp::handleSelfMessage - requestMsg" << endl;
+        handleRequest(check_and_cast<cMessage *>(requestPktQueue_.pop()));
     }
 }
 
@@ -108,16 +127,48 @@ void MECResponseCbrApp::handleRequest(cMessage *msg)
     EV << "MECResponseCbrApp::handleRequest" << endl;
     // this method pretends to perform some computation after having
     //.request some info to the RNI
-    if (currentRequestfMsg_ != nullptr) {
-        delete msg;
-        return;
-//        throw cRuntimeError("MECResponseCbrApp::handleRequest - currentRequestfMsg_ not null!");
+
+    inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
+
+//    auto req = packet->peekAtFront<RequestResponseAppPacket>();
+    if (!packet->peekAtFront<RequestResponseAppPacket>()->getRequestArrivedTimestamp().isZero()) {
+        EV << "MECResponseCbrApp::handleRequest arrivedTimestamp NOT zero t="
+                << packet->peekAtFront<RequestResponseAppPacket>()->getRequestArrivedTimestamp()
+                << " currentReqMsg " << currentRequestMsg_ << endl;
+        if (currentRequestMsg_ != nullptr) {
+            if (!requestPktQueue_.contains(msg))
+                requestPktQueue_.insert(msg);
+            return;
+//            throw cRuntimeError("MECResponseCbrApp::handleRequest - currentRequestMsg_ not null but arrivedTimestamp is not Zero!");
+
+        }
+        currentRequestMsg_ = msg;
+        EV << " currentReqMsg2 " << currentRequestMsg_ << endl;
+        sendGetRequest();
+        getRequestSent_ = simTime();
+    }
+    else {
+        auto req = packet->removeAtFront<RequestResponseAppPacket>();
+        EV << "MECResponseCbrApp::handleRequest arrivedTimestamp t=" << req->getRequestArrivedTimestamp() << endl;
+        req->setRequestArrivedTimestamp(simTime());
+        packet->insertAtFront(req);
+        requestPktQueue_.insert(check_and_cast<cMessage *>(packet));
+        if (!requestMsg_->isScheduled())
+            scheduleAt(simTime(), requestMsg_);
     }
 
-    msgArrived_ = simTime();
-    currentRequestfMsg_ = msg; //.push_back(msg); //
-    sendGetRequest();
-    getRequestSent_ = simTime();
+//    if (currentRequestMsg_ != nullptr) {
+//        // todo gestire
+////        delete msg;
+////        return;
+////        throw cRuntimeError("MECResponseCbrApp::handleRequest - currentRequestMsg_ not null!");
+//    }
+//    else {
+////    msgArrived_ = simTime();
+//        currentRequestMsg_ = packet;
+//        sendGetRequest();
+//        getRequestSent_ = simTime();
+//    }
 }
 
 void MECResponseCbrApp::handleStopRequest(cMessage *msg)
@@ -128,13 +179,19 @@ void MECResponseCbrApp::handleStopRequest(cMessage *msg)
 
 void MECResponseCbrApp::sendResponse()
 {
-    inet::Packet *packet = check_and_cast<inet::Packet *>(currentRequestfMsg_);
+    EV << "MECResponseCbrApp::sendResponse()" << endl;
+    if (currentRequestMsg_ == nullptr) {
+        if(!requestMsg_->isScheduled())
+            scheduleAt(simTime(), requestMsg_);
+        return;
+    }
+    inet::Packet *packet = check_and_cast<inet::Packet *>(currentRequestMsg_);
     ueAppAddress = packet->getTag<L3AddressInd>()->getSrcAddress();
     ueAppPort = packet->getTag<L4PortInd>()->getSrcPort();
 
     auto req = packet->removeAtFront<RequestResponseAppPacket>();
     req->setType(MECAPP_RESPONSE);
-    req->setRequestArrivedTimestamp(msgArrived_);
+//    req->setRequestArrivedTimestamp(msgArrived_);
     req->setServiceResponseTime(getRequestArrived_ - getRequestSent_);
     req->setResponseSentTimestamp(simTime());
     req->setProcessingTime(processingTime_);
@@ -146,11 +203,15 @@ void MECResponseCbrApp::sendResponse()
 
     //clean current request
     delete packet;
-    currentRequestfMsg_ = nullptr; //.erase(currentRequestfMsg_.begin());//
-    msgArrived_ = 0;
+    currentRequestMsg_ = nullptr;
+//    msgArrived_ = 0;
     processingTime_ = 0;
     getRequestArrived_ = 0;
     getRequestSent_ = 0;
+    EV << "MECResponseCbrApp::sendResponse() currentReqMsg3 " << currentRequestMsg_ << endl;
+    if (!requestPktQueue_.isEmpty() && !requestMsg_->isScheduled()) {
+        scheduleAt(simTime(), requestMsg_);
+    }
 }
 
 void MECResponseCbrApp::handleHttpMessage(int connId)
@@ -226,14 +287,15 @@ void MECResponseCbrApp::doComputation()
 {
     processingTime_ = vim->calculateProcessingTime(mecAppId, uniform(minInstructions_, maxInstructions_));
     EV << "time " << processingTime_ << endl;
-    scheduleAt(simTime() + processingTime_, processingTimer_);
+    if (!processingTimer_->isScheduled())
+        scheduleAt(simTime() + processingTime_, processingTimer_);
 }
 
 void MECResponseCbrApp::sendGetRequest()
 {
     //check if the ueAppAddress is specified
     if (serviceSocket_->getState() == inet::TcpSocket::CONNECTED) {
-        EV << "MECResponseCbrApp::sendGetRequest(): send request to the Location Service" << endl;
+        EV << "MECResponseCbrApp::sendGetRequest(): send request to the RNI Service" << endl;
         std::stringstream uri;
         uri << "/example/rni/v2/queries/layer2_meas"; //TODO filter the request to get less data
         EV << "MECResponseCbrApp::requestLocation(): uri: " << uri.str() << endl;
@@ -241,7 +303,7 @@ void MECResponseCbrApp::sendGetRequest()
         Http::sendGetRequest(serviceSocket_, host.c_str(), uri.str().c_str());
     }
     else {
-        EV << "MECResponseCbrApp::sendGetRequest(): Location Service not connected" << endl;
+        EV << "MECResponseCbrApp::sendGetRequest(): RNI Service not connected" << endl;
     }
 }
 
