@@ -67,17 +67,6 @@ void MECResponseCbrApp::initialize(int stage)
 }
 
 
-//void MECResponseCbrApp::handleMessage(cMessage *msg)
-//{
-//    if (msg->isSelfMessage()) {
-//        //todo gestire la coda in qualche modo
-//        handleRequest(msg);
-//    }
-//    else {
-//        MecAppBase::handleMessage(msg);
-//    }
-//}
-
 void MECResponseCbrApp::handleProcessedMessage(cMessage *msg)
 {
     if (!msg->isSelfMessage()) {
@@ -130,16 +119,16 @@ void MECResponseCbrApp::handleRequest(cMessage *msg)
 
     inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
 
-//    auto req = packet->peekAtFront<RequestResponseAppPacket>();
     if (!packet->peekAtFront<RequestResponseAppPacket>()->getRequestArrivedTimestamp().isZero()) {
         EV << "MECResponseCbrApp::handleRequest arrivedTimestamp NOT zero t="
                 << packet->peekAtFront<RequestResponseAppPacket>()->getRequestArrivedTimestamp()
                 << " currentReqMsg " << currentRequestMsg_ << endl;
         if (currentRequestMsg_ != nullptr) {
-            if (!requestPktQueue_.contains(msg))
-                requestPktQueue_.insert(msg);
-            return;
-//            throw cRuntimeError("MECResponseCbrApp::handleRequest - currentRequestMsg_ not null but arrivedTimestamp is not Zero!");
+//            if (!requestPktQueue_.contains(msg))
+//                requestPktQueue_.insert(msg);
+//            return;
+            throw cRuntimeError("MECResponseCbrApp::handleRequest - currentRequestMsg_ not null"
+                    " but arrivedTimestamp is not Zero!");
 
         }
         currentRequestMsg_ = msg;
@@ -153,22 +142,9 @@ void MECResponseCbrApp::handleRequest(cMessage *msg)
         req->setRequestArrivedTimestamp(simTime());
         packet->insertAtFront(req);
         requestPktQueue_.insert(check_and_cast<cMessage *>(packet));
-        if (!requestMsg_->isScheduled())
+        if (currentRequestMsg_ == nullptr && !requestPktQueue_.isEmpty() && !requestMsg_->isScheduled())
             scheduleAt(simTime(), requestMsg_);
     }
-
-//    if (currentRequestMsg_ != nullptr) {
-//        // todo gestire
-////        delete msg;
-////        return;
-////        throw cRuntimeError("MECResponseCbrApp::handleRequest - currentRequestMsg_ not null!");
-//    }
-//    else {
-////    msgArrived_ = simTime();
-//        currentRequestMsg_ = packet;
-//        sendGetRequest();
-//        getRequestSent_ = simTime();
-//    }
 }
 
 void MECResponseCbrApp::handleStopRequest(cMessage *msg)
@@ -185,6 +161,7 @@ void MECResponseCbrApp::sendResponse()
             scheduleAt(simTime(), requestMsg_);
         return;
     }
+
     inet::Packet *packet = check_and_cast<inet::Packet *>(currentRequestMsg_);
     ueAppAddress = packet->getTag<L3AddressInd>()->getSrcAddress();
     ueAppPort = packet->getTag<L4PortInd>()->getSrcPort();
@@ -209,7 +186,7 @@ void MECResponseCbrApp::sendResponse()
     getRequestArrived_ = 0;
     getRequestSent_ = 0;
     EV << "MECResponseCbrApp::sendResponse() currentReqMsg3 " << currentRequestMsg_ << endl;
-    if (!requestPktQueue_.isEmpty() && !requestMsg_->isScheduled()) {
+    if (currentRequestMsg_ == nullptr && !requestPktQueue_.isEmpty() && !requestMsg_->isScheduled()) {
         scheduleAt(simTime(), requestMsg_);
     }
 }
@@ -285,8 +262,9 @@ void MECResponseCbrApp::handleServiceMessage(int connId)
 
 void MECResponseCbrApp::doComputation()
 {
-    processingTime_ = vim->calculateProcessingTime(mecAppId, uniform(minInstructions_, maxInstructions_));
-    EV << "time " << processingTime_ << endl;
+    processingTime_ = 0;    //exponential(0.010);
+//    processingTime_ = vim->calculateProcessingTime(mecAppId, uniform(minInstructions_, maxInstructions_));
+    EV << "processing time " << processingTime_ << endl;
     if (!processingTimer_->isScheduled())
         scheduleAt(simTime() + processingTime_, processingTimer_);
 }

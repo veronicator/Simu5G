@@ -66,7 +66,6 @@ class MECResponseCbrApp : public MecAppBase
 
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }
     void initialize(int stage) override;
-//    void handleMessage(cMessage *msg) override;
     void handleProcessedMessage(cMessage *msg) override;
     void finish() override;
     void handleSelfMessage(cMessage *msg) override;
