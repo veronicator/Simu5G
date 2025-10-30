@@ -91,10 +91,35 @@ ScheduleList& LcgScheduler::schedule(unsigned int availableBytes, Direction gran
                 }
             }
         }
+
+        EV << NOW << " LcgScheduler::schedule - Node  " << mac_->getMacNodeId()
+                << " lcgMap size: " << lcgMap.size() << endl;
+
         // -------------------------------------------------------------------------------------------------- //
 
         //! FIXME Allocation of the same resource to flows with the same priority not implemented
+
+//        LcgMap tmpLcgMap;
+//
+//        for (it = it_pair.first; it != et; ++it) {
+////            tmpLcgMap.insert(LcgPair(it->first, it->second));
+//            tmpLcgMap.insert(*it);
+//        }
+//        int sizeTmpMap = tmpLcgMap.size();
+//        EV << "tmpLcgMap size: " << sizeTmpMap << endl;
+
         for (it = it_pair.first; it != et; ++it) {
+
+//        it = tmpLcgMap.begin();
+//
+//        if (sizeTmpMap != 0) {
+//            int index = mac_->intuniformexcl(0, sizeTmpMap);
+//            std::advance(it, index);
+//        }
+//        for (int i=0; i < tmpLcgMap.size(); ++i) {
+            EV << NOW << " LcgScheduler::schedule - Node  " << mac_->getMacNodeId()
+                    << " for it_pair, it->first: " << it->first
+                    << " it->second.second (pkt in queue): " << it->second.second->getQueueLength() << endl;
             // processing all connections of the same traffic class
 
             // get the connection virtual buffer
@@ -117,6 +142,7 @@ ScheduleList& LcgScheduler::schedule(unsigned int availableBytes, Direction gran
             unsigned int toServe = queueLength;
             // Check whether the virtual buffer is empty
             if (queueLength == 0) {
+                EV << "LcgScheduler::schedule Cid: " << cid << endl;
                 EV << "LcgScheduler::schedule scheduled connection is no longer active " << endl;
                 continue; // go to next connection
             }
@@ -330,6 +356,10 @@ ScheduleList& LcgScheduler::schedule(unsigned int availableBytes, Direction gran
                 i = 0;
                 EV << "LcgScheduler::schedule - Node" << mac_->getMacNodeId() << ", Starting best effort service" << endl;
             }
+//            ++it;
+//            if (it == tmpLcgMap.end()) {
+//                it = tmpLcgMap.begin();
+//            }
         } // END of connections cycle
     } // END of Traffic Classes cycle
 
