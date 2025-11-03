@@ -99,24 +99,26 @@ ScheduleList& LcgScheduler::schedule(unsigned int availableBytes, Direction gran
 
         //! FIXME Allocation of the same resource to flows with the same priority not implemented
 
-//        LcgMap tmpLcgMap;
-//
-//        for (it = it_pair.first; it != et; ++it) {
-////            tmpLcgMap.insert(LcgPair(it->first, it->second));
-//            tmpLcgMap.insert(*it);
-//        }
-//        int sizeTmpMap = tmpLcgMap.size();
-//        EV << "tmpLcgMap size: " << sizeTmpMap << endl;
+        LcgMap tmpLcgMap;
 
         for (it = it_pair.first; it != et; ++it) {
+//            tmpLcgMap.insert(LcgPair(it->first, it->second));
+            tmpLcgMap.insert(*it);
+        }
+        int sizeTmpMap = tmpLcgMap.size();
+        EV << "tmpLcgMap size: " << sizeTmpMap << endl;
 
-//        it = tmpLcgMap.begin();
+//        for (it = it_pair.first; it != et; ++it) {
 //
-//        if (sizeTmpMap != 0) {
-//            int index = mac_->intuniformexcl(0, sizeTmpMap);
-//            std::advance(it, index);
-//        }
-//        for (int i=0; i < tmpLcgMap.size(); ++i) {
+        it = tmpLcgMap.begin();
+
+        if (sizeTmpMap != 0) {
+            int index = mac_->intuniformexcl(0, sizeTmpMap);
+            EV << "LcgScheduler iterator index (intuniform): " << index << endl;
+            std::advance(it, index);
+        }
+        for (int i=0; i < tmpLcgMap.size(); ++i) {
+            EV << "LcgScheduler iterator for (i): " << i << endl;
             EV << NOW << " LcgScheduler::schedule - Node  " << mac_->getMacNodeId()
                     << " for it_pair, it->first: " << it->first
                     << " it->second.second (pkt in queue): " << it->second.second->getQueueLength() << endl;
@@ -136,14 +138,25 @@ ScheduleList& LcgScheduler::schedule(unsigned int availableBytes, Direction gran
             // TODO get the QoS parameters
 
             // connection must have the same direction as the grant
-            if (connDesc.getDirection() != grantDir)
+            if (connDesc.getDirection() != grantDir) {
+                ++it;
+                if (it == tmpLcgMap.end()) {
+                    EV << "it == tmpLcgMap " << endl;
+                    it = tmpLcgMap.begin();
+                }
                 continue;
+            }
 
             unsigned int toServe = queueLength;
             // Check whether the virtual buffer is empty
             if (queueLength == 0) {
                 EV << "LcgScheduler::schedule Cid: " << cid << endl;
                 EV << "LcgScheduler::schedule scheduled connection is no longer active " << endl;
+                ++it;
+                if (it == tmpLcgMap.end()) {
+                    EV << "it == tmpLcgMap " << endl;
+                    it = tmpLcgMap.begin();
+                }
                 continue; // go to next connection
             }
             else {
@@ -356,10 +369,11 @@ ScheduleList& LcgScheduler::schedule(unsigned int availableBytes, Direction gran
                 i = 0;
                 EV << "LcgScheduler::schedule - Node" << mac_->getMacNodeId() << ", Starting best effort service" << endl;
             }
-//            ++it;
-//            if (it == tmpLcgMap.end()) {
-//                it = tmpLcgMap.begin();
-//            }
+            ++it;
+            if (it == tmpLcgMap.end()) {
+                EV << "it == tmpLcgMap " << endl;
+                it = tmpLcgMap.begin();
+            }
         } // END of connections cycle
     } // END of Traffic Classes cycle
 
