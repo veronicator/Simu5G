@@ -45,7 +45,7 @@ simple UERequestApp like IApp
         // stats
 
         @signal[responseTime];
-        @statistic[responseTime](title="responseTime"; unit="s"; source="responseTime"; record=stats,mean,vector);
+        @statistic[responseTime](title="responseTime"; unit="s"; source="responseTime"; record=stats,mean,vector,count);
 
         @signal[processingTime];
         @statistic[processingTime](title="processingTime"; unit="s"; source="processingTime"; record=stats,mean,vector);
