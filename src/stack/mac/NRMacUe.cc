@@ -290,6 +290,7 @@ int NRMacUe::macSduRequest()
 
 void NRMacUe::macPduMake(MacCid cid)
 {
+    EV << "NRMacUe::macPduMake" << endl;
     int64_t size = 0;
 
     macPduList_.clear();
@@ -297,6 +298,7 @@ void NRMacUe::macPduMake(MacCid cid)
     bool bsrAlreadyMade = false;
     // UE is in D2D-mode but it received an UL grant (for BSR)
     for (auto& gitem : schedulingGrant_) {
+        EV << "NRMacUe::macPduMake got gitem: schedulingGrant_" << endl;
         double carrierFreq = gitem.first;
 
         // skip if this is not the turn of this carrier
@@ -304,10 +306,13 @@ void NRMacUe::macPduMake(MacCid cid)
             continue;
 
         if (gitem.second != nullptr && gitem.second->getDirection() == UL && emptyScheduleList_) {
+            EV << "NRMacUe::macPduMake got gitem: schedulingGrant_ -> if 1" << endl;
             if (bsrTriggered_ || bsrD2DMulticastTriggered_) {
+                EV << "NRMacUe::macPduMake got gitem: schedulingGrant_ -> if 1.1" << endl;
                 // Compute BSR size taking into account only DM flows
                 int sizeBsr = 0;
                 for (auto [cid, buffer] : macBuffers_) {
+                    EV << "NRMacUe::macPduMake got gitem: schedulingGrant_ -> if 1.2 -> for auto[cid, buffer]: macBuffers_" << endl;
                     Direction connDir = (Direction)connDesc_[cid].getDirection();
 
                     // if the bsr was triggered by D2D (D2D_MULTI), only account for D2D (D2D_MULTI) connections
@@ -328,6 +333,7 @@ void NRMacUe::macPduMake(MacCid cid)
                 }
 
                 if (sizeBsr > 0) {
+                    EV << "NRMacUe::macPduMake got gitem: schedulingGrant_ -> if 1.1.1" << endl;
                     // Call the appropriate function for making a BSR for D2D communication
                     Packet *macPktBsr = makeBsr(sizeBsr);
                     auto info = macPktBsr->getTagForUpdate<UserControlInfo>();
@@ -356,6 +362,7 @@ void NRMacUe::macPduMake(MacCid cid)
                     bsrRtxTimer_ = bsrRtxTimerStart_;  // this prevents the UE from sending an unnecessary RAC request
                 }
                 else {
+                    EV << "NRMacUe::macPduMake got gitem: schedulingGrant_ -> else - if 1.1.1" << endl;
                     bsrD2DMulticastTriggered_ = false;
                     bsrTriggered_ = false;
                     bsrRtxTimer_ = 0;
@@ -366,9 +373,12 @@ void NRMacUe::macPduMake(MacCid cid)
     }
 
     if (!bsrAlreadyMade) {
+        EV << "NRMacUe::macPduMake -> if !bsrAlreadyMade" << endl;
         // In a D2D communication if BSR was created above this part isn't executed
         // Build a MAC PDU for each scheduled user on each codeword
         for (auto [carrierFreq, schList] : scheduleList_) {
+            EV << "NRMacUe::macPduMake -> if !bsrAlreadyMade -> for [carrierFreq, schList]: scheduleList"
+                    << "\n\t scheduleList_ size:" << scheduleList_.size() << endl;
             // skip if this is not the turn of this carrier
             if (getNumerologyPeriodCounter(binder_->getNumerologyIndexFromCarrierFreq(carrierFreq)) > 0)
                 continue;
@@ -379,6 +389,9 @@ void NRMacUe::macPduMake(MacCid cid)
 
                 MacCid destCid = item.first.first;
                 Codeword cw = item.first.second;
+
+                EV << "NRMacUe::macPduMake -> if !bsrAlreadyMade -> for [carrierFreq, schList]: scheduleList -> for item: schList"
+                        << "\n\t destCid: " << destCid << endl;
 
                 // get the direction (UL/D2D/D2D_MULTI) and the corresponding destination ID
                 FlowControlInfo *lteInfo = &(connDesc_.at(destCid));
@@ -427,6 +440,7 @@ void NRMacUe::macPduMake(MacCid cid)
                 }
 
                 while (sduPerCid > 0) {
+                    EV << "NRMacUe::macPduMake -> if !bsrAlreadyMade -> for [carrierFreq, schList]: scheduleList -> for item: schList -> while sduPerCid" << endl;
                     // Add SDU to PDU
                     // Find Mac Pkt
                     if (mbuf_.find(destCid) == mbuf_.end())
@@ -455,16 +469,34 @@ void NRMacUe::macPduMake(MacCid cid)
                     sduPerCid--;
                 }
 
-                // consider virtual buffers to compute BSR size
-                size += macBuffers_[destCid]->getQueueOccupancy();
 
-                if (size > 0) {
-                    // take into account the RLC header size
-                    if (connDesc_[destCid].getRlcType() == UM)
-                        size += RLC_HEADER_UM;
-                    else if (connDesc_[destCid].getRlcType() == AM)
-                        size += RLC_HEADER_AM;
-                }
+//                // consider virtual buffers to compute BSR size
+//                size += macBuffers_[destCid]->getQueueOccupancy();
+//
+//                EV << "NRMacUe::macPduMake -> if !bsrAlreadyMade -> for [carrierFreq, schList]: scheduleList -> for item: schList - end while"
+//                        << "\n\t size += macBuffers_[destCid]->getQueueOccupancy() -> size: " << size << endl;
+//                if (size > 0) {
+//                    // take into account the RLC header size
+//                    if (connDesc_[destCid].getRlcType() == UM)
+//                        size += RLC_HEADER_UM;
+//                    else if (connDesc_[destCid].getRlcType() == AM)
+//                        size += RLC_HEADER_AM;
+//                }
+            }
+        }
+
+        for (auto [cid, buffer] : macBuffers_) {
+            EV << "NRMacUe::macPduMake -> if !bsrAlreadyMade -> for[cid, buffer->queueLength]: mcBuffers_: [" << cid << ", " << buffer->getQueueLength() << "]" << endl;
+            // consider virtual buffers to compute BSR size
+            size += buffer->getQueueOccupancy();
+            EV << "\tsize = " << size << endl;
+
+            if (size > 0) {
+                // take into account the RLC header size
+                if (connDesc_[cid].getRlcType() == UM)
+                    size += RLC_HEADER_UM;
+                else if (connDesc_[cid].getRlcType() == AM)
+                    size += RLC_HEADER_AM;
             }
         }
     }
