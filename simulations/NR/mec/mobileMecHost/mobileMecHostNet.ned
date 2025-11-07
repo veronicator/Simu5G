@@ -20,7 +20,6 @@ import simu5g.nodes.NR.NRUe;
 import simu5g.nodes.NR.gNodeB;
 import simu5g.nodes.Upf;
 import simu5g.nodes.backgroundCell.BackgroundCell;
-import simu5g.nodes.mec.MECHost;
 import simu5g.nodes.mec.MobileHostNode;
 import simu5g.nodes.mec.MECOrchestrator.MecOrchestrator;
 import simu5g.nodes.mec.UALCMP.UALCMP;
