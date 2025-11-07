@@ -30,5 +30,5 @@ module gNodeB extends eNodeB
         nodeType = "GNODEB";        // DO NOT CHANGE
         cellularNic.typename = default("NRNicEnb");
 
-//        bool isMobile = default(false);
+        bool isMobile = default(false);		// DO NOT REMOVE!
 }
