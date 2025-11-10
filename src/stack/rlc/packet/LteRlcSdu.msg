@@ -25,4 +25,5 @@ class LteRlcSdu extends inet::FieldsChunk
     chunkLength = inet::B(1); // TODO: should be a tag;
     unsigned int snoMainPacket;                        // ID of packet (sequence number)
     unsigned int lengthMainPacket;
+    double sduCreationTime;
 }

@@ -166,6 +166,7 @@ void LteRlcUm::handleUpperMessage(cPacket *pktAux)
     auto rlcPkt = inet::makeShared<LteRlcSdu>();
     rlcPkt->setSnoMainPacket(lteInfo->getSequenceNumber());
     rlcPkt->setLengthMainPacket(pkt->getByteLength());
+    rlcPkt->setSduCreationTime(simTime().dbl());
     pkt->insertAtFront(rlcPkt);
 
     drop(pkt);

@@ -263,7 +263,7 @@ void UmRxEntity::toPdcp(Packet *pktAux)
     auto lteInfo = pktAux->getTag<FlowControlInfo>();
     unsigned int sno = rlcSdu->getSnoMainPacket();
     unsigned int length = pktAux->getByteLength();
-    simtime_t ts = pktAux->getCreationTime();
+    simtime_t ts = rlcSdu->getSduCreationTime();
 
     // create a PDCP PDU and send it to the upper layer
     MacNodeId ueId;
