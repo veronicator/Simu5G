@@ -34,12 +34,14 @@ import simu5g.world.radio.LteChannelControl;
 network DynamicMobileMecHost
 {
     parameters:
+        @display("i=block/network2;bgb=1500,1000;bgi=background/pisa");
+
         int numUe = default(1);
         int numBgCells = default(0);
         double routersDelay @unit(m) = default(0m);
 //        volatile double routersDelay @unit(m) = default(normal(2m, 0.8m));
 
-        @display("i=block/network2;bgb=1588,1078;");
+//        @display("i=block/network2;bgb=1588,1078;");
     submodules:
         channelControl: LteChannelControl {
             @display("p=50,25;is=s");
@@ -69,33 +71,33 @@ network DynamicMobileMecHost
             @display("p=891,238");
         }
         gnb1: gNodeB {
-            @display("p=285,375;is=vl");
+            @display("p=186,454;is=vl");
         }
         gnb2: gNodeB {
-            @display("p=685,394;is=vl");
+            @display("p=684,454;is=vl");
         }
         gnb3: gNodeB {
-            @display("p=1112,382;is=vl");
+            @display("p=1201,454;is=vl");
         }
         bgCell[numBgCells]: BackgroundCell {
-            @display("p=80,576;is=vl");
+            @display("p=80,723;is=vl");
         }
         ue[numUe]: NRUe {
-            @display("p=291,624");
+            @display("p=283,684");
         }
 
-        //# MEC modules
-        mecHost1: MECHost {
-            @display("p=343,238");
-        }
-        mecHost2: MECHost {
-            @display("p=590,238");
-        }
-        mecHost3: MECHost {
-            @display("p=793,238");
-        }
+        //        //# MEC modules
+                mecHost1: MECHost {
+                    @display("p=343,238");
+                }
+        //        mecHost2: MECHost {
+        //            @display("p=590,238");
+        //        }
+        //        mecHost3: MECHost {
+        //            @display("p=793,238");
+        //        }
         mobileMecHost: MobileHostNode {
-            @display("p=251,511");
+            @display("p=253,589");
         }
         mecOrchestrator: MecOrchestrator {
             @display("p=835,35");
@@ -121,9 +123,11 @@ network DynamicMobileMecHost
         ualcmp.toMecOrchestrator --> mecOrchestrator.fromUALCMP;
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
         mecHost1.ppp++ <--> Eth10G <--> iUpf1.pppg++;
-        mecHost2.ppp++ <--> Eth10G <--> iUpf2.pppg++;
-        mecHost3.ppp++ <--> Eth10G <--> iUpf3.pppg++;
+//        mecHost2.ppp++ <--> Eth10G <--> iUpf2.pppg++;
+//        mecHost3.ppp++ <--> Eth10G <--> iUpf3.pppg++;
 
-
+        //# X2 connections
+        gnb1.x2++ <--> Eth10G <--> gnb2.x2++;
+        gnb2.x2++ <--> Eth10G <--> gnb3.x2++;
 
 }
