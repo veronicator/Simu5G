@@ -302,6 +302,9 @@ class LteRealisticChannelModel : public LteChannelModel
         return -1;
     }
 
+    // compute effective sinr from a vector of per-RB SINRs. Can be used to compute BLER
+    double computeEesm(const std::vector<double>& sinrV, double beta);
+
     /*
      * Compute the path-loss attenuation according to the selected scenario
      *

@@ -1817,6 +1817,8 @@ bool LteRealisticChannelModel::isError(LteAirFrame *frame, UserControlInfo *lteI
     double sumSnr = 0.0;
     int usedRBs = 0;
 
+    std::vector<double> usedSinr;
+
     // for each Remote unit used to transmit the packet
     for (const auto &[remoteUnit, rbList] : rbmap) {
         // for each logical band used to transmit the packet
@@ -1837,34 +1839,48 @@ bool LteRealisticChannelModel::isError(LteAirFrame *frame, UserControlInfo *lteI
             if (cqi == 0 || cqi > 15)
                 throw cRuntimeError("A packet has been transmitted with a cqi equal to 0 or greater than 15 cqi:%d txmode:%d dir:%d rb:%d cw:%d rtx:%d", cqi, lteInfo->getTxMode(), dir, band, cw, nTx);
 
-            // for statistical purposes
-            sumSnr += snrV[band];
-            usedRBs++;
-
-            int snr = snrV[band];// XXX because band is a Band (=unsigned short)
-            if (snr < binder_->phyPisaData.minSnr())
-                return false;
-            else if (snr > binder_->phyPisaData.maxSnr())
-                bler = 0;
-            else
-                bler = binder_->phyPisaData.getBler(itxmode, cqi - 1, snr);
-
-            EV << "\t bler computation: [itxMode=" << itxmode << "] - [cqi-1=" << cqi - 1
-               << "] - [snr=" << snr << "]" << endl;
-
-            double success = 1 - bler;
-            // compute the success probability according to the number of RB used
-            double successPacket = pow(success, (double)allocation);
-            // compute the success probability according to the number of LB used
-            finalSuccess *= successPacket;
-
-            EV << " LteRealisticChannelModel::error direction " << dirToA(dir)
-               << " node " << id << " remote unit " << dasToA(remoteUnit)
-               << " Band " << band << " SNR " << snr << " CQI " << cqi
-               << " BLER " << bler << " success probability " << successPacket
-               << " total success probability " << finalSuccess << endl;
+            usedSinr.push_back(snrV[band]);
+//            // for statistical purposes
+//            sumSnr += snrV[band];
+//            usedRBs++;
         }
     }
+
+    double beta = 1.0;
+    double sinrEff = 10 * std::log10(computeEesm(usedSinr, beta));  // dB
+    if (sinrEff < binder_->phyPisaData.minSnr())
+        return false;
+    else if (sinrEff > binder_->phyPisaData.maxSnr())
+        bler = 0;
+    else
+        bler = binder_->phyPisaData.getBler(itxmode, cqi - 1, sinrEff);
+
+    finalSuccess = 1 - bler;
+
+//            int snr = snrV[band];// XXX because band is a Band (=unsigned short)
+//            if (snr < binder_->phyPisaData.minSnr())
+//                return false;
+//            else if (snr > binder_->phyPisaData.maxSnr())
+//                bler = 0;
+//            else
+//                bler = binder_->phyPisaData.getBler(itxmode, cqi - 1, snr);
+//
+//            EV << "\t bler computation: [itxMode=" << itxmode << "] - [cqi-1=" << cqi - 1
+//               << "] - [snr=" << snr << "]" << endl;
+//
+//            double success = 1 - bler;
+//            // compute the success probability according to the number of RB used
+//            double successPacket = pow(success, (double)allocation);
+//            // compute the success probability according to the number of LB used
+//            finalSuccess *= successPacket;
+//
+//            EV << " LteRealisticChannelModel::error direction " << dirToA(dir)
+//               << " node " << id << " remote unit " << dasToA(remoteUnit)
+//               << " Band " << band << " SNR " << snr << " CQI " << cqi
+//               << " BLER " << bler << " success probability " << successPacket
+//               << " total success probability " << finalSuccess << endl;
+//        }
+//    }
     // Compute total error probability
     double per = 1 - finalSuccess;
     // Harq Reduction
@@ -3015,5 +3031,22 @@ bool LteRealisticChannelModel::computeD2DInterference(MacNodeId eNbId, MacNodeId
     return true;
 }
 
+// Function to compute Effective SINR using EESM
+double LteRealisticChannelModel::computeEesm(const std::vector<double>& sinrV, double beta)
+{
+    if (sinrV.empty()) return 0.0;
+
+    double sumExp = 0.0;
+    for (double sinr : sinrV) {
+        double sinr_linear = std::pow(10.0, sinr / 10.0);
+        // Assume SINR values are in linear scale; if in dB, convert first
+        sumExp += std::exp(-sinr_linear / beta);
+    }
+
+    double meanExp = sumExp / static_cast<double>(sinrV.size());
+    double sinrEff = -beta * std::log(meanExp);
+
+    return sinrEff;
+}
 } //namespace
 
