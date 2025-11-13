@@ -157,6 +157,8 @@ void LteMacEnb::initialize(int stage)
             amc_->setPilotMode(MEDIAN_CQI);
         else if (modeString == "ROBUST_CQI")
             amc_->setPilotMode(ROBUST_CQI);
+        else if (modeString == "STDDEV_CQI")
+            amc_->setPilotMode(STDDEV_CQI);
         else
             throw cRuntimeError("LteMacEnb::initialize - Unknown Pilot Mode %s \n", modeString.c_str());
 

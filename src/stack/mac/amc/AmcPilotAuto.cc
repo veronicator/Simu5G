@@ -166,8 +166,30 @@ const UserTxParams& AmcPilotAuto::computeTxParams(MacNodeId id, const Direction 
         chosenBand = 0;
     }
     else if (mode_ == MEDIAN_CQI) {
-        // MEAN cqi computation method
+        // MEDIAN cqi computation method
         chosenCqi = binder_->medianCqi(sfb.getCqi(0), id, dir);
+        for (Band i = 0; i < sfb.getCqi(0).size(); ++i) {
+            Band cellWiseBand = amc_->getCellInfo()->getCellwiseBand(carrierFrequency, i);
+            bandSet.insert(cellWiseBand);
+        }
+        chosenBand = 0;
+    }
+    else if (mode_ == STDDEV_CQI) {
+        double mean = 0;
+        for (Cqi value : sfb.getCqi(0)) {
+            mean += value;
+        }
+        mean /= sfb.getCqi(0).size();
+
+        double varSum = 0;
+        for (Cqi value : sfb.getCqi(0))
+            varSum = (value - mean) * (value - mean);
+        double var = (double)varSum / sfb.getCqi(0).size();
+        double stddev = sqrt(var);
+        double k = 1.5;
+        chosenCqi = floor(mean - k * stddev);
+        if (chosenCqi <= 0)
+            chosenCqi = 2;
         for (Band i = 0; i < sfb.getCqi(0).size(); ++i) {
             Band cellWiseBand = amc_->getCellInfo()->getCellwiseBand(carrierFrequency, i);
             bandSet.insert(cellWiseBand);

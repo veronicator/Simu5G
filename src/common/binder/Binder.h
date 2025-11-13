@@ -536,7 +536,6 @@ class Binder : public cSimpleModule
     }
 
     Cqi meanCqi(std::vector<Cqi> bandCqi, MacNodeId id, Direction dir);
-
     Cqi medianCqi(std::vector<Cqi> bandCqi, MacNodeId id, Direction dir);
 
     /*
