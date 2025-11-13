@@ -115,6 +115,7 @@ enum PilotComputationModes
     AVG_CQI = 2;
     MEDIAN_CQI = 3;
     ROBUST_CQI = 4;
+    STDDEV_CQI = 5;
 };
 
 
