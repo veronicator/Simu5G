@@ -36,7 +36,7 @@ network DynamicMobileMecHost
     parameters:
         @display("i=block/network2;bgb=1500,1000;bgi=background/pisa");
 
-        int numUe = default(1);
+        int numUes = default(1);
         int numBgCells = default(0);
         double routersDelay @unit(m) = default(0m);
 //        volatile double routersDelay @unit(m) = default(normal(2m, 0.8m));
@@ -82,7 +82,7 @@ network DynamicMobileMecHost
         bgCell[numBgCells]: BackgroundCell {
             @display("p=80,723;is=vl");
         }
-        ue[numUe]: NRUe {
+        ue[numUes]: NRUe {
             @display("p=283,684");
         }
 
