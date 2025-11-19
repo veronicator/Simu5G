@@ -120,25 +120,19 @@ void MECResponseCbrApp::handleRequest(cMessage *msg)
     inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
 
     if (!packet->peekAtFront<RequestResponseAppPacket>()->getRequestArrivedTimestamp().isZero()) {
-        EV << "MECResponseCbrApp::handleRequest arrivedTimestamp NOT zero t="
-                << packet->peekAtFront<RequestResponseAppPacket>()->getRequestArrivedTimestamp()
-                << " currentReqMsg " << currentRequestMsg_ << endl;
         if (currentRequestMsg_ != nullptr) {
 //            if (!requestPktQueue_.contains(msg))
 //                requestPktQueue_.insert(msg);
 //            return;
-            throw cRuntimeError("MECResponseCbrApp::handleRequest - currentRequestMsg_ not null"
-                    " but arrivedTimestamp is not Zero!");
+            throw cRuntimeError("MECResponseCbrApp::handleRequest - currentRequestMsg_ not null");
 
         }
         currentRequestMsg_ = msg;
-        EV << " currentReqMsg2 " << currentRequestMsg_ << endl;
         sendGetRequest();
         getRequestSent_ = simTime();
     }
     else {
         auto req = packet->removeAtFront<RequestResponseAppPacket>();
-        EV << "MECResponseCbrApp::handleRequest arrivedTimestamp t=" << req->getRequestArrivedTimestamp() << endl;
         req->setRequestArrivedTimestamp(simTime());
         packet->insertAtFront(req);
         requestPktQueue_.insert(check_and_cast<cMessage *>(packet));
@@ -168,7 +162,6 @@ void MECResponseCbrApp::sendResponse()
 
     auto req = packet->removeAtFront<RequestResponseAppPacket>();
     req->setType(MECAPP_RESPONSE);
-//    req->setRequestArrivedTimestamp(msgArrived_);
     req->setServiceResponseTime(getRequestArrived_ - getRequestSent_);
     req->setResponseSentTimestamp(simTime());
     req->setProcessingTime(processingTime_);
@@ -181,11 +174,9 @@ void MECResponseCbrApp::sendResponse()
     //clean current request
     delete packet;
     currentRequestMsg_ = nullptr;
-//    msgArrived_ = 0;
     processingTime_ = 0;
     getRequestArrived_ = 0;
     getRequestSent_ = 0;
-    EV << "MECResponseCbrApp::sendResponse() currentReqMsg3 " << currentRequestMsg_ << endl;
     if (currentRequestMsg_ == nullptr && !requestPktQueue_.isEmpty() && !requestMsg_->isScheduled()) {
         scheduleAt(simTime(), requestMsg_);
     }
