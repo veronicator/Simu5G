@@ -202,20 +202,31 @@ void MECResponseCbrApp::handleMp1Message(int connId)
     try {
         nlohmann::json jsonBody = nlohmann::json::parse(mp1HttpMessage->getBody()); // get the JSON structure
         if (!jsonBody.empty()) {
-            jsonBody = jsonBody[0];
-            std::string serName = jsonBody["serName"];
-            if (serName == "RNIService") {
-                if (jsonBody.contains("transportInfo")) {
-                    nlohmann::json endPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
-                    EV << "address: " << endPoint["host"] << " port: " << endPoint["port"] << endl;
-                    std::string address = endPoint["host"];
-                    serviceAddress_ = L3AddressResolver().resolve(address.c_str());
-                    servicePort_ = endPoint["port"];
-                    serviceSocket_ = addNewSocket();
-                    connect(serviceSocket_, serviceAddress_, servicePort_);
+            nlohmann::json tmpEndPoint = nullptr;
+            // std::cout << "jsonBody = " << jsonBody << endl;
+            for (auto jsonBodyIt: jsonBody) {
+                std::string serName = jsonBodyIt["serName"];
+                if (serName == "RNIService") {
+                    std::string isLocal = jsonBodyIt["isLocal"];
+                    if (isLocal == "TRUE") {
+                        if (jsonBodyIt.contains("transportInfo")) {
+                            tmpEndPoint = jsonBodyIt["transportInfo"]["endPoint"]["addresses"];
+                            break;
+                        }
+                    } else {
+                        tmpEndPoint = jsonBodyIt["transportInfo"]["endPoint"]["addresses"];
+                    }
                 }
             }
-            else {
+            if (tmpEndPoint != nullptr) {
+                nlohmann::json endPoint = tmpEndPoint;
+                EV << "address: " << endPoint["host"] << " port: " << endPoint["port"] << endl;
+                std::string address = endPoint["host"];
+                serviceAddress_ = L3AddressResolver().resolve(address.c_str());
+                servicePort_ = endPoint["port"];
+                serviceSocket_ = addNewSocket();
+                connect(serviceSocket_, serviceAddress_, servicePort_);
+            } else {
                 EV << "MECPlatooningApp::handleMp1Message - RNIService not found" << endl;
                 serviceAddress_ = L3Address();
             }
