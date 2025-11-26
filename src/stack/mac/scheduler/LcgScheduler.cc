@@ -91,10 +91,6 @@ ScheduleList& LcgScheduler::schedule(unsigned int availableBytes, Direction gran
                 }
             }
         }
-
-        EV << NOW << " LcgScheduler::schedule - Node  " << mac_->getMacNodeId()
-                << " lcgMap size: " << lcgMap.size() << endl;
-
         // -------------------------------------------------------------------------------------------------- //
 
         //! FIXME Allocation of the same resource to flows with the same priority not implemented
@@ -102,24 +98,19 @@ ScheduleList& LcgScheduler::schedule(unsigned int availableBytes, Direction gran
         LcgMap tmpLcgMap;
 
         for (it = it_pair.first; it != et; ++it) {
-//            tmpLcgMap.insert(LcgPair(it->first, it->second));
             tmpLcgMap.insert(*it);
         }
         int sizeTmpMap = tmpLcgMap.size();
         EV << "tmpLcgMap size: " << sizeTmpMap << endl;
 
-//        for (it = it_pair.first; it != et; ++it) {
-//
         it = tmpLcgMap.begin();
 
         if (sizeTmpMap != 0) {
             int index = mac_->intuniformexcl(0, sizeTmpMap);
-            EV << "LcgScheduler iterator index (intuniform): " << index << endl;
             std::advance(it, index);
         }
         for (int i=0; i < tmpLcgMap.size(); ++i, ++it) {
             if (it == tmpLcgMap.end()) {
-                EV << "it == tmpLcgMap " << endl;
                 it = tmpLcgMap.begin();
             }
             EV << "LcgScheduler iterator for (i): " << i << endl;

@@ -381,11 +381,6 @@ void NRPhyUe::doHandover()
             cellInfo_->lambdaInit(nodeId_, index);
             cellInfo_->channelUpdate(nodeId_, intuniform(1, binder_->phyPisaData.maxChannel2()));
         }
-
-        // send a self-message to schedule the possible mode switch at the end of the TTI (after all UEs have performed the handover)
-        cMessage *msg = new cMessage("doModeSwitchAtHandover");
-        msg->setSchedulingPriority(10);
-        scheduleAt(NOW, msg);
     }
 
     // update DL feedback generator
