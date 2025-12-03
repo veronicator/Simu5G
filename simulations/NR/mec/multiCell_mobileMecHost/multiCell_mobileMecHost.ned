@@ -1,19 +1,8 @@
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with this program.  If not, see http://www.gnu.org/licenses/.
+//                  Simu5G
 //
 
-package simu5g.simulations.NR.mec.dynamicMobileMecHost;
+package simu5g.simulations.NR.mec.multiCell_mobileMecHost;
 
 import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
 import inet.networklayer.ipv4.RoutingTableRecorder;
@@ -31,7 +20,7 @@ import simu5g.nodes.mec.UALCMP.UALCMP;
 import simu5g.world.radio.LteChannelControl;
 
 
-network DynamicMobileMecHost
+network multiCell_mobileMecHost
 {
     parameters:
         @display("i=block/network2;bgb=1500,1000;bgi=background/pisa");
@@ -39,9 +28,16 @@ network DynamicMobileMecHost
         int numUes = default(1);
         int numBgCells = default(0);
         double routersDelay @unit(m) = default(0m);
-//        volatile double routersDelay @unit(m) = default(normal(2m, 0.8m));
 
-//        @display("i=block/network2;bgb=1588,1078;");
+        bool isMobile = default(true);
+        bool isStatic = default(true);
+
+    types:
+        channel C extends DatarateChannel
+        {
+            delay = 10ms;
+            datarate = 5Mbps;
+        }
     submodules:
         channelControl: LteChannelControl {
             @display("p=50,25;is=s");
@@ -62,13 +58,13 @@ network DynamicMobileMecHost
             @display("p=685,116");
         }
         iUpf1: Upf {
-            @display("p=495,238");
+            @display("p=482,271");
         }
         iUpf2: Upf {
-            @display("p=685,238");
+            @display("p=683,271");
         }
         iUpf3: Upf {
-            @display("p=891,238");
+            @display("p=940,291");
         }
         gnb1: gNodeB {
             @display("p=186,454;is=vl");
@@ -86,17 +82,17 @@ network DynamicMobileMecHost
             @display("p=283,684");
         }
 
-        //        //# MEC modules
-                mecHost1: MECHost {
-                    @display("p=343,238");
-                }
+        // MEC modules
+        mecHost1: MECHost if isStatic {
+            @display("p=343,238");
+        }
         //        mecHost2: MECHost {
         //            @display("p=590,238");
         //        }
         //        mecHost3: MECHost {
         //            @display("p=793,238");
         //        }
-        mobileMecHost: MobileHostNode {
+        mobileMecHost: MobileHostNode if isMobile {
             @display("p=253,589");
         }
         mecOrchestrator: MecOrchestrator {
@@ -122,7 +118,7 @@ network DynamicMobileMecHost
         ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
         ualcmp.toMecOrchestrator --> mecOrchestrator.fromUALCMP;
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
-        mecHost1.ppp++ <--> Eth10G <--> iUpf1.pppg++;
+        mecHost1.ppp++ <--> Eth10G <--> iUpf1.pppg++ if isStatic;
 //        mecHost2.ppp++ <--> Eth10G <--> iUpf2.pppg++;
 //        mecHost3.ppp++ <--> Eth10G <--> iUpf3.pppg++;
 
