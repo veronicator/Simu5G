@@ -29,7 +29,6 @@ network multiCell_mobileMecHost
 
         int numUes = default(1);
         int numBgCells = default(0);
-        double routersDelay @unit(m) = default(0m);
 
         bool isMobile = default(true);
         bool isStatic = default(true);

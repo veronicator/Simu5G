@@ -155,7 +155,7 @@ TrafficFlowTemplateId TrafficFlowFilter::findTrafficFlow(L3Address srcAddress, L
                     return 0;                                        // local delivery
             }
 
-            EV << "// the destination is a MEC host under a different core network, send the packet to the gateway" << endl;
+            // the destination is a MEC host under a different core network, send the packet to the gateway"
             return -1;
         }
 
