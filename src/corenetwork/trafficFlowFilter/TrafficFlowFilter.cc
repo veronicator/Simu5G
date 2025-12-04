@@ -146,7 +146,16 @@ TrafficFlowTemplateId TrafficFlowFilter::findTrafficFlow(L3Address srcAddress, L
         // check if the destination belongs to another core network (for multi-operator scenarios)
         std::string destGw = binder_->getNetworkName() + "." + CHK(inet::L3AddressResolver().findHostWithAddress(destAddress))->par("gateway").stdstringValue();
         if (gateway_ != destGw) {
-            // the destination is a MEC host under a different core network, send the packet to the gateway
+
+            MacNodeId destMaster = binder_->getMasterNode(binder_->getNextHop(binder_->getMacNodeId(destAddress.toIpv4())));
+            MacNodeId srcMaster = binder_->getNextHop(binder_->getMacNodeId(srcAddress.toIpv4()));
+
+            if (isBaseStation(ownerType_)) {
+                if (fastForwarding_ && srcMaster == destMaster)
+                    return 0;                                        // local delivery
+            }
+
+            EV << "// the destination is a MEC host under a different core network, send the packet to the gateway" << endl;
             return -1;
         }
 
