@@ -104,12 +104,22 @@ network multiCell_mobileMecHost
             @display("p=685,35");
         }
 
+        internet: InternetCloud {
+            @display("p=685,149;is=vl");
+        }
+
     connections:
 
         //# 5G Core Network connections
-        upf.pppg++ <--> Eth10G <--> iUpf1.pppg++;
-        upf.pppg++ <--> Eth10G <--> iUpf2.pppg++;
-        upf.pppg++ <--> Eth10G <--> iUpf3.pppg++;
+        upf.pppg++ <--> C <--> internet.pppg++;
+        iUpf1.pppg++ <--> C <--> internet.pppg++;
+        iUpf2.pppg++ <--> C <--> internet.pppg++;
+        iUpf3.pppg++ <--> C <--> internet.pppg++;
+
+//        upf.pppg++ <--> Eth10G <--> iUpf1.pppg++;
+//        upf.pppg++ <--> Eth10G <--> iUpf2.pppg++;
+//        upf.pppg++ <--> Eth10G <--> iUpf3.pppg++;
+
         iUpf1.pppg++ <--> Eth10G <--> gnb1.ppp;
         iUpf2.pppg++ <--> Eth10G <--> gnb2.ppp;
         iUpf3.pppg++ <--> Eth10G <--> gnb3.ppp;
