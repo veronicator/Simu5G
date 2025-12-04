@@ -20,6 +20,7 @@ import simu5g.nodes.NR.NRUe;
 import simu5g.nodes.NR.gNodeB;
 import simu5g.nodes.Upf;
 import simu5g.nodes.backgroundCell.BackgroundCell;
+import simu5g.nodes.mec.MECHost;
 import simu5g.nodes.mec.MobileHostNode;
 import simu5g.nodes.mec.MECOrchestrator.MecOrchestrator;
 import simu5g.nodes.mec.UALCMP.UALCMP;
@@ -33,6 +34,10 @@ network mobileMecHostNet
 
         int numUes = default(0);
         int numBgCells = default(0);
+
+        bool isMobile = default(true);
+        bool isStatic = default(false);
+
 
         double playgroundSizeX @unit(m); // x size of the area the nodes are in (in meters)
         double playgroundSizeY @unit(m); // y size of the area the nodes are in (in meters)
@@ -71,8 +76,12 @@ network mobileMecHostNet
             @display("p=341,357");
         }
         //# MEC module
-        mecHost: MobileHostNode {
+        mecHost: MobileHostNode if isMobile {
             @display("p=488,193;is=l");
+        }
+
+        mecHost_static: MECHost if isStatic {
+            @display("p=741,271");
         }
 
         mecOrchestrator: MecOrchestrator {
@@ -89,6 +98,7 @@ network mobileMecHostNet
         upf.pppg++ <--> Eth10G <--> iUpf.pppg++;
         iUpf.pppg++ <--> Eth10G <--> gNodeB1.ppp;
         ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
+        mecHost_static.ppp++ <--> Eth10G <--> iUpf.pppg++ if isStatic;
 
         ualcmp.toMecOrchestrator --> mecOrchestrator.fromUALCMP;
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
