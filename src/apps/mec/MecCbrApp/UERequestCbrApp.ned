@@ -59,6 +59,9 @@ simple UERequestCbrApp like IApp
         @signal[downLinkTime];
         @statistic[downLinkTime](title="downLinkTime"; unit="s"; source="downLinkTime"; record=stats,mean,vector);
 
+        @signal[instantiationTime];
+        @statistic[instantiationTime](title="appInstantiationTime"; unit="s"; source="instantiationTime"; record=stats,mean);
+
 
 
     gates:

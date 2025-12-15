@@ -41,6 +41,8 @@ class UERequestCbrApp : public cSimpleModule
     simtime_t start_;
     simtime_t end_;
 
+    simtime_t startTime;
+
     // DeviceApp info
     int localPort_;
     int deviceAppPort_;
@@ -70,6 +72,7 @@ class UERequestCbrApp : public cSimpleModule
     static simsignal_t upLinkTimeSignal_;
     static simsignal_t downLinkTimeSignal_;
     static simsignal_t responseTimeSignal_;
+    static simsignal_t instantiationTimeSignal_;
 
   public:
     ~UERequestCbrApp() override;

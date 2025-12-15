@@ -37,6 +37,7 @@ simsignal_t UERequestCbrApp::serviceResponseTimeSignal_ = registerSignal("servic
 simsignal_t UERequestCbrApp::upLinkTimeSignal_ = registerSignal("upLinkTime");
 simsignal_t UERequestCbrApp::downLinkTimeSignal_ = registerSignal("downLinkTime");
 simsignal_t UERequestCbrApp::responseTimeSignal_ = registerSignal("responseTime");
+simsignal_t UERequestCbrApp::instantiationTimeSignal_ = registerSignal("instantiationTime");
 
 UERequestCbrApp::~UERequestCbrApp()
 {
@@ -169,6 +170,8 @@ void UERequestCbrApp::sendStartMECRequestCbrApp()
     start->addTagIfAbsent<inet::CreationTimeTag>()->setCreationTime(simTime());
     packet->insertAtBack(start);
 
+    startTime = simTime();
+
     socket.sendTo(packet, deviceAppAddress_, deviceAppPort_);
 
     //rescheduling
@@ -207,6 +210,10 @@ void UERequestCbrApp::handleAckStartMECRequestCbrApp(cMessage *msg)
     auto pkt = packet->peekAtFront<DeviceAppStartAckPacket>();
 
     if (pkt->getResult() == true) {
+
+        simtime_t instantiationTime = simTime() - startTime;
+        emit(instantiationTimeSignal_, instantiationTime);
+
         mecAppAddress_ = L3AddressResolver().resolve(pkt->getIpAddress());
         mecAppPort_ = pkt->getPort();
         EV << "UERequestCbrApp::handleAckStartMECRequestCbrApp - Received " << pkt->getType() << " type RequestPacket. mecApp instance is at: " << mecAppAddress_ << ":" << mecAppPort_ << endl;
@@ -217,7 +224,7 @@ void UERequestCbrApp::handleAckStartMECRequestCbrApp(cMessage *msg)
             scheduleAt(simTime() + stopTime, selfStop_);
             EV << "UERequestCbrApp::handleAckStartMECRequestCbrApp - Starting sendStopMECRequestCbrApp() in " << stopTime << " seconds " << endl;
         }
-        //send the first reuqest to the MEC app
+        //send the first request to the MEC app
         sendRequest();
     }
     else {
