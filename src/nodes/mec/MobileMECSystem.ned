@@ -42,7 +42,7 @@ module MobileMECSystem
         @figure[linkLayer.title](type=text; pos=845,461; anchor=ne; text="link layer");
         @figure[submodules];
 
-        bool isMobile = default(false);
+        bool isMobile = default(true);
 
         //# Apps
         int numApps = default(0);   // no of apps.
@@ -184,7 +184,7 @@ module MobileMECSystem
         }
         ipv6: <default("Ipv6NetworkLayer")> like INetworkLayer if hasIpv6 {
             parameters:
-                @display("p=525,376;q=queue");
+                @display("p=715,375;q=queue");
         }
 
                 //#
