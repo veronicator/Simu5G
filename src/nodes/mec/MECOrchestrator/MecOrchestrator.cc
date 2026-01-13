@@ -27,6 +27,7 @@
 #include "nodes/mec/MECOrchestrator/mecHostSelectionPolicies/MecServiceSelectionBased.h"
 #include "nodes/mec/MECOrchestrator/mecHostSelectionPolicies/AvailableResourcesSelectionBased.h"
 #include "nodes/mec/MECOrchestrator/mecHostSelectionPolicies/MecHostSelectionBased.h"
+#include "nodes/mec/MECOrchestrator/mecHostSelectionPolicies/MigrationMecServiceSelectionBased.h"
 
 // Emulation debug
 #include <iostream>
@@ -53,6 +54,8 @@ void MecOrchestrator::initialize(int stage)
         mecHostSelectionPolicy_ = new AvailableResourcesSelectionBased(this);
     else if (!strcmp(selectionPolicyPar, "MecHostBased"))
         mecHostSelectionPolicy_ = new MecHostSelectionBased(this, par("mecHostIndex"));
+    else if (!strcmp(selectionPolicyPar, "MigrationSelectionBased"))
+        mecHostSelectionPolicy_ = new MigrationMecServiceSelectionBased(this, par("mecHostIndex"));
     else
         throw cRuntimeError("MecOrchestrator::initialize - Selection policy '%s' not present!", selectionPolicyPar);
 
