@@ -25,7 +25,7 @@ simple MecOrchestrator
         @display("i=device/mainframe;bgb=1006,692");
         string binderModule = default("binder");
 
-        string selectionPolicy @enum(MecHostBased,MecServiceBased,AvailableResourcesBased) = default("MecServiceBased"); // available policies: "MecHostBased", "MecServiceBased", "AvailableResourcesBased"
+        string selectionPolicy @enum(MecHostBased,MecServiceBased,AvailableResourcesBased, MigrationSelectionBased) = default("MecServiceBased"); // available policies: "MecHostBased", "MecServiceBased", "AvailableResourcesBased"
         int mecHostIndex = default(0); // to be used with the MecHostBased policybased
         object mecHostList = default([]);
         object mecApplicationPackageList = default([]);

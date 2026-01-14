@@ -55,7 +55,7 @@ void MecOrchestrator::initialize(int stage)
     else if (!strcmp(selectionPolicyPar, "MecHostBased"))
         mecHostSelectionPolicy_ = new MecHostSelectionBased(this, par("mecHostIndex"));
     else if (!strcmp(selectionPolicyPar, "MigrationSelectionBased"))
-        mecHostSelectionPolicy_ = new MigrationMecServiceSelectionBased(this, par("mecHostIndex"));
+        mecHostSelectionPolicy_ = new MigrationMecServiceSelectionBased(this);
     else
         throw cRuntimeError("MecOrchestrator::initialize - Selection policy '%s' not present!", selectionPolicyPar);
 
