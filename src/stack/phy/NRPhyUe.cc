@@ -19,7 +19,7 @@ namespace simu5g {
 
 Define_Module(NRPhyUe);
 
-
+simsignal_t NRPhyUe::handoverServingCellSignal_ = registerSignal("handoverServingCell");
 
 void NRPhyUe::initialize(int stage)
 {
@@ -388,6 +388,7 @@ void NRPhyUe::doHandover()
 
     // collect stat
     emit(servingCellSignal_, (long)masterId_);
+    emit(handoverServingCellSignal_, (intval_t)masterId_);
 
     if (masterId_ == NODEID_NONE)
         EV << NOW << " NRPhyUe::doHandover - UE " << nodeId_ << " detached from the network" << endl;

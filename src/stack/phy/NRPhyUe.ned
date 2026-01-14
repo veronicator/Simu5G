@@ -23,5 +23,9 @@ simple NRPhyUe extends LtePhyUeD2D
     parameters:
         @class("NRPhyUe");
         string otherPhyModule;
+
+        @signal[handoverServingCell];
+        @statistic[handoverServingCell](unit=""; source="handoverServingCell"; record=vector);
+
 }
 
