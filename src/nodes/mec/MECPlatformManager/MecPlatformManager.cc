@@ -65,6 +65,13 @@ bool MecPlatformManager::terminateMEApp(DeleteAppMessage *msg)
     return res;
 }
 
+void MecPlatformManager::migrateMEApps() {
+    if (mecOrchestrator != nullptr) {
+//        MecOrchestrator *meo = check_and_cast<MecOrchestrator *>(mecOrchestrator->getModuleType());
+        mecOrchestrator->doMigrations(this);
+    }
+}
+
 const std::vector<ServiceInfo> *MecPlatformManager::getAvailableMecServices() const
 {
     if (serviceRegistry == nullptr)

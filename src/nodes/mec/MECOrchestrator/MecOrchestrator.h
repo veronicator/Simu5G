@@ -113,6 +113,8 @@ class MecOrchestrator : public cSimpleModule
      */
     void registerMecService(ServiceDescriptor&) const;
 
+    void doMigrations(cModule *mepm);
+
   protected:
 
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }

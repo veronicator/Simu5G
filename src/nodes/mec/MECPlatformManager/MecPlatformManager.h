@@ -67,6 +67,8 @@ class MecPlatformManager : public cSimpleModule
     bool terminateMEApp(DeleteAppMessage *msg);
     bool terminateEmulatedMEApp(DeleteAppMessage *msg);
 
+    void migrateMEApps();
+
     const std::vector<ServiceInfo> *getAvailableMecServices() const;
 
     /*
