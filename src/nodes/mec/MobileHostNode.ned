@@ -29,6 +29,8 @@ import simu5g.nodes.mec.VirtualisationInfrastructureManager.VirtualisationInfras
 module MobileHostNode
 {
     parameters:
+        @class(MobileMECHost);
+
         @networkNode();
         @display("i=device/device;bgb=1219,700");
         @figure[applicationLayer](type=rectangle; pos=250,6; size=600,130; lineColor=#808080; cornerRadius=5; fillColor=#ffff00; fillOpacity=0.1);
