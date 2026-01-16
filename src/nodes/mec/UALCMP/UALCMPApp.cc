@@ -88,12 +88,19 @@ void UALCMPApp::handleMessageWhenUp(cMessage *msg)
         UALCMPMessage *lcmMsg = check_and_cast<UALCMPMessage *>(msg);
         if (strcmp(lcmMsg->getType(), ACK_CREATE_CONTEXT_APP) == 0) {
             handleCreateContextAppAckMessage(lcmMsg);
+
+            pendingRequests.erase(lcmMsg->getRequestId());
         }
         else if (strcmp(lcmMsg->getType(), ACK_DELETE_CONTEXT_APP) == 0) {
             handleDeleteContextAppAckMessage(lcmMsg);
+
+            pendingRequests.erase(lcmMsg->getRequestId());
+        }
+        else if (strcmp(lcmMsg->getType(), ACK_MIGRATE_CONTEXT_APP) == 0) {
+            handleMigrateContextAppAckMessage(lcmMsg);
         }
 
-        pendingRequests.erase(lcmMsg->getRequestId());
+//        pendingRequests.erase(lcmMsg->getRequestId());
         delete msg;
 
         return;
@@ -171,6 +178,45 @@ void UALCMPApp::handleDeleteContextAppAckMessage(UALCMPMessage *msg)
             pd.type = "Request not successfully completed";
             pd.title = "DeleteContext request result";
             pd.detail = "the MEC system was not able to terminate the MEC application";
+            pd.status = "500";
+            Http::send500Response(socket, pd.toJson().dump().c_str());
+        }
+    }
+}
+
+void UALCMPApp::handleMigrateContextAppAckMessage(UALCMPMessage *msg)
+{
+    CreateContextAppAckMessage *ack = check_and_cast<CreateContextAppAckMessage *>(msg);
+    int ueAppId = ack->getRequestId();
+
+
+    EV << "UALCMPApp::handleMigrateContextAppAckMessage - ueAppId: " << ueAppId << endl;
+
+    nlohmann::json jsonBody;
+
+    if(ueSockets.empty() || ueSockets.find(ueAppId) == ueSockets.end()) {
+        EV << "UALCMPApp::handleMigrateContextAppAckMessage - ERROR ueAppId: " << ueAppId << " does not exist in ueSockets map \n\t this should not happen" << endl;
+        return;
+    }
+    int sockId = ueSockets[ueAppId];
+    inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(socketMap.getSocketById(sockId));
+
+    if (socket) {
+        if (ack->getSuccess()) {
+
+            jsonBody["contextId"] = std::to_string(ack->getContextId());
+            jsonBody["appInfo"]["userAppInstanceInfo"]["appInstanceId"] = ack->getAppInstanceId();
+            jsonBody["appInfo"]["userAppInstanceInfo"]["referenceURI"] = ack->getAppInstanceUri(); // add the end point
+            std::stringstream uri;
+            uri << baseUriQueries_ << "/app_contexts/" << ack->getContextId();
+            std::pair<std::string, std::string> locHeader("Location: ", uri.str());
+            Http::send201Response(socket, jsonBody.dump().c_str(), locHeader);
+        }
+        else {
+            Http::ProblemDetailBase pd;
+            pd.type = "Request not successfully completed";
+            pd.title = "MigrateContext request result";
+            pd.detail = "the MEC system was not able to instantiate the MEC application";
             pd.status = "500";
             Http::send500Response(socket, pd.toJson().dump().c_str());
         }
@@ -273,6 +319,10 @@ void UALCMPApp::handlePOSTRequest(const HttpRequestMessage *currentRequestMessag
 
             createContext->setUeIpAddress(socket->getRemoteAddress().str().c_str());
             pendingRequests[requestSno] = { socket->getSocketId(), requestSno, jsonBody };
+
+            // Retrieve UE App ID for mapping ueAppId to socketId
+            int ueAppID = atoi(createContext->getDevAppId());
+            ueSockets[ueAppID] = socket->getSocketId();
 
             EV << "POST request number: " << requestSno << " related to connId: " << socket->getSocketId() << endl;
 

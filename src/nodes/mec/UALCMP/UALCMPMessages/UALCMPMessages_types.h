@@ -21,5 +21,8 @@
 #define UPDATE_CONTEXT_APP        "UpdateContextApp"
 #define ACK_UPDATE_CONTEXT_APP     "UpdateContextAppAck"
 
+#define MIGRATE_CONTEXT_APP        "MigrateContextApp"
+#define ACK_MIGRATE_CONTEXT_APP    "MigrateContextAppAck"
+
 #endif /* NODES_MEC_LCMPROXY_LCMPROXYMESSAGES_LCMPROXYMESSAGES_TYPES_H_ */
 

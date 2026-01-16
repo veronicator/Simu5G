@@ -238,6 +238,64 @@ void DeviceApp::handleUALCMPMessage()
                 break;
             }
 
+            case APPCREATED: {
+                // case when the instanceApp is already created but an app migration is necessary
+                // in this case the appState in the DeviceApp is APPCREATED and has not to be changed
+                if (response->getCode() == 201) { // Successful response of the post
+                    nlohmann::json jsonBody = nlohmann::json::parse(UALCMPMessage->getBody());
+                    inet::Packet *packet = new inet::Packet("DeviceAppStartAckPacket");
+                    std::string contextUri = response->getHeaderField("Location");
+
+                    if (contextUri.empty()) {
+                        // todo: handle this case for app migration
+                        //ERROR
+                        EV << "DeviceApp::handleUALCMPMessage - ERROR (on CREATE/MIGRATE 201) - Mec Application Context not created, i.e. the MEC app has not been instantiated on the new mec host" << endl;
+                        return;
+                    }
+                    else {
+                        appContextUri = contextUri;
+                        std::string mecAppEndPoint = jsonBody["appInfo"]["userAppInstanceInfo"]["referenceURI"];
+
+                        EV_INFO << "DeviceApp::handleUALCMPMessage - reference URI of the application instance context is: " << appContextUri << endl;
+                        EV_INFO << "DeviceApp::handleUALCMPMessage - endPoint of the mec application instance is: " << mecAppEndPoint << endl;
+
+                        std::vector<std::string> endPoint = cStringTokenizer(mecAppEndPoint.c_str(), ":").asVector();
+
+                        std::string contextId = jsonBody["contextId"];
+
+                        EV_DEBUG << "DeviceApp::handleUALCMPMessage - sending ACK to the UE app" << endl;
+
+                        auto ack = inet::makeShared<DeviceAppStartAckPacket>();
+                        ack->setType(ACK_MIGRATE_MECAPP);
+                        ack->setContextId(contextId.c_str());
+                        ack->setResult(true);
+                        ack->setIpAddress(endPoint[0].c_str());
+                        ack->setPort(atoi(endPoint[1].c_str()));
+
+                        ack->setChunkLength(inet::B(2 + mecAppEndPoint.size() + contextId.size() + 1));
+                        ack->addTagIfAbsent<inet::CreationTimeTag>()->setCreationTime(simTime());
+
+                        packet->insertAtBack(ack);
+                    }
+
+                    ueAppSocket_.sendTo(packet, ueAppAddress, ueAppPort);
+
+                    appState = APPCREATED;
+                    return;
+                }
+                else if (response->getCode() == 500) {
+                    // todo handle in case of app migration (e.g. stop upApp ?)
+                    //ERROR
+                    EV << "DeviceApp::handleUALCMPMessage - ERROR (on CREATE " << response->getCode() << ") - Mec Application Context not created, i.e. the MEC app has not been instantiated" << endl;
+                    return;
+                }
+                else {
+                    // in state create only 201 and 500 code are allowed, if other code arrives, something went wrong...
+                    EV << "DeviceApp::handleUALCMPMessage - HTTP code " << response->getCode() << " not allowe in CREATE state" << endl;
+                }
+                break;
+            }
+
             case IDLE:
             default:
                 throw cRuntimeError("DeviceApp::handleUALCMPMessage() - appstate IDLE. No messages should arrive from the UALCMP");

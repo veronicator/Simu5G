@@ -52,6 +52,9 @@ class UALCMPApp : public MecServiceBase
     unsigned int requestSno = 0;    // counter to keep track of the requests
     std::map<unsigned int, LcmRequestStatus> pendingRequests;
 
+    // map to store ueAppId and the corresponding socketId <ueAppId, socketId>
+    std::map<int, int> ueSockets;
+
   public:
     UALCMPApp();
 
@@ -78,6 +81,7 @@ class UALCMPApp : public MecServiceBase
      */
     void handleCreateContextAppAckMessage(UALCMPMessage *msg);
     void handleDeleteContextAppAckMessage(UALCMPMessage *msg);
+    void handleMigrateContextAppAckMessage(UALCMPMessage *msg);
 
     /*
      * Method used to parse the body of POST requests for the instantiation of MEC apps.

@@ -136,6 +136,8 @@ void UERequestCbrApp::handleMessage(cMessage *msg)
                 handleAckStartMECRequestCbrApp(msg);
             else if (!strcmp(mePkt->getType(), ACK_STOP_MECAPP))
                 handleAckStopMECRequestCbrApp(msg);
+            else if (!strcmp(mePkt->getType(), ACK_MIGRATE_MECAPP))
+                handleAckMigrateMECRequestCbrApp(msg);  //todo
             else
                 throw cRuntimeError("UERequestCbrApp::handleMessage - \tFATAL! Error, DeviceAppPacket type %s not recognized", mePkt->getType());
         }
@@ -252,9 +254,39 @@ void UERequestCbrApp::handleAckStopMECRequestCbrApp(cMessage *msg)
     cancelEvent(selfStop_);
 }
 
+void UERequestCbrApp::handleAckMigrateMECRequestCbrApp(cMessage *msg)
+{
+    EV << "UERequestCbrApp::handleAckMigrateMECRequestCbrApp - Received Migrate ACK packet" << endl;
+    inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
+    auto pkt = packet->peekAtFront<DeviceAppStartAckPacket>();
+
+    if (pkt->getResult() == true) {
+
+        mecAppAddress_ = L3AddressResolver().resolve(pkt->getIpAddress());
+        mecAppPort_ = pkt->getPort();
+        EV << "UERequestCbrApp::handleAckMigrateMECRequestCbrApp - Received " << pkt->getType() << " type RequestPacket. mecApp instance is at: " << mecAppAddress_ << ":" << mecAppPort_ << endl;
+        cancelEvent(selfStart_);
+        //scheduling sendStopMEWarningAlertApp()
+        if (!selfStop_->isScheduled()) {
+            simtime_t stopTime = par("stopTime");
+            scheduleAt(simTime() + stopTime, selfStop_);
+            EV << "UERequestCbrApp::handleAckMigrteMECRequestCbrApp - Starting sendStopMECRequestCbrApp() in " << stopTime << " seconds " << endl;
+        }
+    }
+//    else {    // todo results == false in case of migration
+//        EV << "UERequestCbrApp::handleAckStartMECRequestCbrApp - MEC application cannot be instantiated! Reason: " << pkt->getReason() << endl;
+//        simtime_t startTime = par("startTime");
+//        EV << "UERequestCbrApp::initialize - starting sendStartMECRequestCbrApp() in " << startTime << " seconds " << endl;
+//        if (!selfStart_->isScheduled())
+//            scheduleAt(simTime() + startTime, selfStart_);
+//    }
+
+    delete packet;
+}
+
 void UERequestCbrApp::sendRequest()
 {
-    EV << "UERequestCbrApp::sendRequest()" << endl;
+    EV << "UERequestCbrApp::sendRequest" << endl;
     inet::Packet *pkt = new inet::Packet("RequestResponseAppPacket");
     auto req = inet::makeShared<RequestResponseAppPacket>();
     req->setType(UEAPP_REQUEST);

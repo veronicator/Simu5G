@@ -17,6 +17,7 @@
 
 #define ACK_START_MECAPP    "MecAppStartAck"
 #define ACK_STOP_MECAPP     "MecAppStopAck"
+#define ACK_MIGRATE_MECAPP  "MecAppMigrateAck"
 
 #define INFO_MECAPP         "MecAppInfo"
 #define INFO_UEAPP          "UEAppInfo"

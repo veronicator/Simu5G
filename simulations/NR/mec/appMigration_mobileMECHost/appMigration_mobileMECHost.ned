@@ -56,7 +56,7 @@ network appMigration_mobileMECHost
             @display("p=685,116");
         }
         iUpf1: Upf {
-            @display("p=576,349");
+            @display("p=556,347");
         }
         iUpf2: Upf {
             @display("p=853,349");

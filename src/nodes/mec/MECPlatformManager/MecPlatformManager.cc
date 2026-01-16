@@ -67,8 +67,8 @@ bool MecPlatformManager::terminateMEApp(DeleteAppMessage *msg)
 
 void MecPlatformManager::migrateMEApps() {
     if (mecOrchestrator != nullptr) {
-//        MecOrchestrator *meo = check_and_cast<MecOrchestrator *>(mecOrchestrator->getModuleType());
-        mecOrchestrator->doMigrations(this);
+        mecOrchestrator->doMigrations(this->getId());
+//        vim->terminateAllMEApps();
     }
 }
 

@@ -20,6 +20,8 @@ namespace simu5g {
 
 class MigrationMecServiceSelectionBased : public SelectionPolicyBase
 {
+    friend class MecOrchestrator;
+
   protected:
     cModule *findBestMecHost(const ApplicationDescriptor&) override;
     cModule *findNewBestMecHost(const ApplicationDescriptor&, const char*);

@@ -35,13 +35,13 @@ void MobileMECHost::initialize(int stage)
 
 void MobileMECHost::receiveSignal(cComponent *source, simsignal_t signalID, intval_t value, cObject *)
 {
-    std::cout << "receive signal mec host" << endl;
+//    std::cout << "receive signal mec host" << endl;
     if (hasPar("doMigration")) {
         doMigration = par("doMigration").boolValue();
     }
     MecPlatformManager *mepm = check_and_cast<MecPlatformManager *>(this->getSubmodule("mecPlatformManager"));
     if (doMigration && signalID == NRPhyUe::handoverServingCellSignal_) {
-        std::cout << "receiveSignal servingCellSignal_: " << signalID << endl;
+//        std::cout << "receiveSignal servingCellSignal_: " << signalID << endl;
         mepm->migrateMEApps();
     }
 }

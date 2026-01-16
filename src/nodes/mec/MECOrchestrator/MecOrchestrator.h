@@ -113,7 +113,7 @@ class MecOrchestrator : public cSimpleModule
      */
     void registerMecService(ServiceDescriptor&) const;
 
-    void doMigrations(cModule *mepm);
+    void doMigrations(int mepmId);
 
   protected:
 
@@ -136,6 +136,7 @@ class MecOrchestrator : public cSimpleModule
     // sending ACK_CREATE_CONTEXT_APP or ACK_DELETE_CONTEXT_APP
     void sendCreateAppContextAck(bool result, unsigned int requestSno, int contextId = -1);
     void sendDeleteAppContextAck(bool result, unsigned int requestSno, int contextId = -1);
+    void sendMigrateAppContextAck(bool result, int ueAppId, int contextId = -1);
 
     /*
      * This method selects the most suitable MEC host where to deploy the MEC app.
