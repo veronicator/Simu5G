@@ -26,6 +26,8 @@ simple UERequestCbrApp like IApp
     parameters:
         @display("i=block/source");
 
+        string binderModule = default("binder");
+
         //connection infos
         int localPort = default(4000);
         int deviceAppPort = default(4000); // port of the DeviceApp
@@ -62,6 +64,8 @@ simple UERequestCbrApp like IApp
         @signal[instantiationTime];
         @statistic[instantiationTime](title="appInstantiationTime"; unit="s"; source="instantiationTime"; record=stats,mean);
 
+        @signal[migrationTime];
+        @statistic[migrationTime](title="appMigrationTime"; unit="s"; source="migrationTime"; record=last,mean);
 
 
     gates:

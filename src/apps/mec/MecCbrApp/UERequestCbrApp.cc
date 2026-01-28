@@ -38,6 +38,7 @@ simsignal_t UERequestCbrApp::upLinkTimeSignal_ = registerSignal("upLinkTime");
 simsignal_t UERequestCbrApp::downLinkTimeSignal_ = registerSignal("downLinkTime");
 simsignal_t UERequestCbrApp::responseTimeSignal_ = registerSignal("responseTime");
 simsignal_t UERequestCbrApp::instantiationTimeSignal_ = registerSignal("instantiationTime");
+simsignal_t UERequestCbrApp::migrationTimeSignal_ = registerSignal("migrationTime");
 
 UERequestCbrApp::~UERequestCbrApp()
 {
@@ -51,45 +52,51 @@ void UERequestCbrApp::initialize(int stage)
 {
     EV << "UERequestCbrApp::initialize - stage " << stage << endl;
     cSimpleModule::initialize(stage);
+
+    if (stage == inet::INITSTAGE_LOCAL)
+        binder_.reference(this, "binderModule", true);
+
     // avoid multiple initializations
-    if (stage != inet::INITSTAGE_APPLICATION_LAYER)
-        return;
+    else if (stage == inet::INITSTAGE_APPLICATION_LAYER) {
+//        return;
 
-    sno_ = 0;
+        sno_ = 0;
 
-    //retrieve parameters
-    requestPacketSize_ = B(par("requestPacketSize"));
-    requestPeriod_ = par("period");
+        //retrieve parameters
+        requestPacketSize_ = B(par("requestPacketSize"));
+        requestPeriod_ = par("period");
 
-    localPort_ = par("localPort");
-    deviceAppPort_ = par("deviceAppPort");
+        localPort_ = par("localPort");
+        deviceAppPort_ = par("deviceAppPort");
 
-    const char *deviceAppAddressStr = par("deviceAppAddress").stringValue();
-    deviceAppAddress_ = inet::L3AddressResolver().resolve(deviceAppAddressStr);
+        const char *deviceAppAddressStr = par("deviceAppAddress").stringValue();
+        deviceAppAddress_ = inet::L3AddressResolver().resolve(deviceAppAddressStr);
 
-    //binding socket
-    socket.setOutputGate(gate("socketOut"));
-    socket.bind(localPort_);
+        //binding socket
+        socket.setOutputGate(gate("socketOut"));
+        socket.bind(localPort_);
 
-    int tos = par("tos");
-    if (tos != -1)
-        socket.setTos(tos);
+        int tos = par("tos");
+        if (tos != -1)
+            socket.setTos(tos);
 
-    mecAppName = par("mecAppName").stringValue();
+        mecAppName = par("mecAppName").stringValue();
 
-    //initializing the auto-scheduling messages
-    selfStart_ = new cMessage("selfStart", KIND_SELF_START);
-    selfStop_ = new cMessage("selfStop", KIND_SELF_STOP);
-    sendRequest_ = new cMessage("sendRequest", KIND_SEND_REQUEST);
-    unBlockingMsg_ = new cMessage("unBlockingMsg", KIND_UN_BLOCKING_MSG);
+        //initializing the auto-scheduling messages
+        selfStart_ = new cMessage("selfStart", KIND_SELF_START);
+        selfStop_ = new cMessage("selfStop", KIND_SELF_STOP);
+        sendRequest_ = new cMessage("sendRequest", KIND_SEND_REQUEST);
+        unBlockingMsg_ = new cMessage("unBlockingMsg", KIND_UN_BLOCKING_MSG);
 
-    //starting UERequestCbrApp
-    simtime_t startTime = par("startTime");
-    EV << "UERequestCbrApp::initialize - starting sendStartMECResponseCbrApp() in " << startTime << " seconds " << endl;
-    scheduleAt(simTime() + startTime, selfStart_);
+        //starting UERequestCbrApp
+        simtime_t startTime = par("startTime");
+        EV << "UERequestCbrApp::initialize - starting sendStartMECResponseCbrApp() in " << startTime << " seconds " << endl;
+        scheduleAt(simTime() + startTime, selfStart_);
 
-    //testing
-    EV << "UERequestCbrApp::initialize - binding to port: local:" << localPort_ << " , dest:" << deviceAppPort_ << endl;
+        //testing
+        EV << "UERequestCbrApp::initialize - binding to port: local:" << localPort_ << " , dest:" << deviceAppPort_ << endl;
+
+    }
 }
 
 void UERequestCbrApp::handleMessage(cMessage *msg)
@@ -137,7 +144,7 @@ void UERequestCbrApp::handleMessage(cMessage *msg)
             else if (!strcmp(mePkt->getType(), ACK_STOP_MECAPP))
                 handleAckStopMECRequestCbrApp(msg);
             else if (!strcmp(mePkt->getType(), ACK_MIGRATE_MECAPP))
-                handleAckMigrateMECRequestCbrApp(msg);  //todo
+                handleAckMigrateMECRequestCbrApp(msg);
             else
                 throw cRuntimeError("UERequestCbrApp::handleMessage - \tFATAL! Error, DeviceAppPacket type %s not recognized", mePkt->getType());
         }
@@ -262,11 +269,14 @@ void UERequestCbrApp::handleAckMigrateMECRequestCbrApp(cMessage *msg)
 
     if (pkt->getResult() == true) {
 
+        simtime_t migrationTime = simTime() - binder_->getStartMECHostHandover();
+        emit(migrationTimeSignal_, migrationTime);
+
         mecAppAddress_ = L3AddressResolver().resolve(pkt->getIpAddress());
         mecAppPort_ = pkt->getPort();
         EV << "UERequestCbrApp::handleAckMigrateMECRequestCbrApp - Received " << pkt->getType() << " type RequestPacket. mecApp instance is at: " << mecAppAddress_ << ":" << mecAppPort_ << endl;
         cancelEvent(selfStart_);
-        //scheduling sendStopMEWarningAlertApp()
+        //scheduling sendStopMECRequestCbrApp()
         if (!selfStop_->isScheduled()) {
             simtime_t stopTime = par("stopTime");
             scheduleAt(simTime() + stopTime, selfStop_);

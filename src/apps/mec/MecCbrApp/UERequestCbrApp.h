@@ -31,6 +31,11 @@ enum {
 
 class UERequestCbrApp : public cSimpleModule
 {
+    //------------------------------------
+    //Binder module
+    inet::ModuleRefByPar<Binder> binder_;
+    //------------------------------------
+
     //communication to device app and mec app
     inet::UdpSocket socket;
 
@@ -73,6 +78,7 @@ class UERequestCbrApp : public cSimpleModule
     static simsignal_t downLinkTimeSignal_;
     static simsignal_t responseTimeSignal_;
     static simsignal_t instantiationTimeSignal_;
+    static simsignal_t migrationTimeSignal_;
 
   public:
     ~UERequestCbrApp() override;
