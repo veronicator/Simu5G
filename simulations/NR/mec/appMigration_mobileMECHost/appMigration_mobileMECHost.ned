@@ -8,6 +8,7 @@ import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
 import inet.networklayer.ipv4.RoutingTableRecorder;
 import inet.node.ethernet.Eth10G;
 import inet.node.internetcloud.InternetCloud;
+import inet.node.inet.Router;
 import ned.DatarateChannel;
 import simu5g.common.binder.Binder;
 import simu5g.common.carrierAggregation.CarrierAggregation;
@@ -53,7 +54,7 @@ network appMigration_mobileMECHost
             @display("p=50,258;is=s");
         }
         upf: Upf {
-            @display("p=685,116");
+            @display("p=705,191");
         }
         iUpf1: Upf {
             @display("p=556,347");
@@ -89,7 +90,12 @@ network appMigration_mobileMECHost
         }
 
         internet: InternetCloud {
-            @display("p=715,203;is=vl");
+            @display("p=705,203;is=vl");
+        }
+
+        router: Router {
+
+            @display("p=705,124");
         }
 
     connections:
@@ -108,9 +114,13 @@ network appMigration_mobileMECHost
 
 
         //# MEC-related connections
-        ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
+        router.pppg++ <--> Eth10G <--> upf.filterGate;
+
+        ualcmp.ppp++ <--> Eth10G <--> router.pppg++;
         ualcmp.toMecOrchestrator --> mecOrchestrator.fromUALCMP;
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
+
+        mecOrchestrator.ppp++ <--> Eth10G <--> router.pppg++;
 
         //# X2 connections
         gnb1.x2++ <--> Eth10G <--> gnb2.x2++;

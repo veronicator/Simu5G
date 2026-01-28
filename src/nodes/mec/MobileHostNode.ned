@@ -43,8 +43,10 @@ module MobileHostNode
         @figure[linkLayer.title](type=text; pos=845,461; anchor=ne; text="link layer");
         @figure[submodules];
 
+        string binderModule = default("binder");
+
 		bool isMobile = default(true);
-		bool doMigration = default(false);	// param to enable app migration - ~make MEC host mobility aware
+		bool isMobilityAware = default(false);	// param to enable app migration - ~make MEC host mobility aware
 		
         //# Apps
         int numApps = default(0);   // no of apps.
@@ -245,6 +247,9 @@ module MobileHostNode
             app[i].socketOut --> at.in++;
             app[i].socketIn <-- at.out++;
         }
+
+        mecPlatformManager.socketOut --> at.in++;
+        mecPlatformManager.socketIn <-- at.out++;
 
         at.out++ --> udp.appIn if hasUdp;
         at.in++ <-- udp.appOut if hasUdp;

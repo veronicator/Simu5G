@@ -154,6 +154,8 @@ TrafficFlowTemplateId TrafficFlowFilter::findTrafficFlow(L3Address srcAddress, L
                 if (fastForwarding_ && srcMaster == destMaster)
                     return 0;                                        // local delivery
             }
+            else if (destMaster > NODEID_NONE)
+                return num(destMaster);
 
             // the destination is a MEC host under a different core network, send the packet to the gateway"
             return -1;

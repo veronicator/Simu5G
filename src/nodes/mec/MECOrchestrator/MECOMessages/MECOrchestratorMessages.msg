@@ -21,13 +21,21 @@ message MECOrchestratorMessage {
     bool success;   
 }
 
-class CreateAppMessage extends inet::FieldsChunk {
-   
+class MECAppMessage extends inet::FieldsChunk {
+    chunkLength = inet::B(8);
+        
+    //type of message
+    string type;
+    
+}
+
+class CreateAppMessage extends MECAppMessage {
+
     unsigned int sno;
     simtime_t timestamp;
     
-    //type of message
-    string type;
+//    //type of message
+//    string type;
     
     //communication informations
     string sourceAddress;
@@ -58,13 +66,13 @@ class CreateAppMessage extends inet::FieldsChunk {
     
 }
 
-class DeleteAppMessage extends inet::FieldsChunk {
+class DeleteAppMessage extends MECAppMessage {
    
     unsigned int sno;
     simtime_t timestamp;
     
-    //type of message
-    string type;
+//    //type of message
+//    string type;
     
     //communication informations
     string sourceAddress;
@@ -89,5 +97,81 @@ class DeleteAppMessage extends inet::FieldsChunk {
     
     //service required
     string requiredService;
+}
+
+class MigrateAppMessage extends MECAppMessage {
+    
+   	int mepmId;
+   	string mepmAddress;
+   
+    unsigned int sno;
+    simtime_t timestamp;
+    
+//    //type of message
+//    string type;
+    
+//    //communication informations
+//    string sourceAddress;
+//    int	   sourcePort;   // added by Alessandro Noferi
+//    string destinationAddress;
+//    int	   destinationPort;   // added by Alessandro Noferi
+//    string destinationMecAppAddress;
+//    int	   destinationMecAppPort;   // added by Alessandro Noferi
+    
+    
+//    //instantiation informations
+//    string MEModuleType;			//path where to find the cModule of the MEApp to instantiate
+//    string MEModuleName;			//module class name of the MEApp to instantiate
+    int contextId;
+    
+//    //identification information
+//    int ueAppID;
+    
+//    //resources required
+//    double requiredDisk;
+//    double requiredRam;
+//    double requiredCpu;
+//    
+//    //service required
+//    string requiredService;
+//    //service provded
+//    string providedService;
+    
+}
+
+class MigrateAppAckMessage extends MECAppMessage {
+    
+   	int mepmId;
+   	string mepmAddress;
+   	
+    int contextId;
+   
+    unsigned int sno;
+    simtime_t timestamp;
+    
+//    MecAppInstanceInfo appInfo;
+    bool status;
+    string instanceId;
+    string endPointAddr;	// cast to inet::L3Address
+    int endPointPort;
+    int moduleId;		// mec app instance omnet module id
+    
+//    struct SockAddr {
+//    inet::L3Address addr;
+//    int port;
+//    std::string str() const { return addr.str() + ":" + std::to_string(port); }
+//};
+    
+//    //type of message
+//    string type;
+//    struct MecAppInstanceInfo
+//    {
+//        bool status;
+//        string instanceId;
+//        SockAddr endPoint;
+//        cModule *reference;
+//    };
+//    
+    
 }
 

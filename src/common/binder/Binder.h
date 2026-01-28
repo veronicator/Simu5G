@@ -147,6 +147,10 @@ class Binder : public cSimpleModule
     std::set<MacNodeId> ueHandoverTriggered_;
     std::map<MacNodeId, std::pair<MacNodeId, MacNodeId>> handoverTriggered_;
 
+
+    // start time mobile mec host handover - scenario specific
+    simtime_t startMECHostHandover = SIMTIME_ZERO;    // default value
+
   protected:
     void initialize(int stages) override;
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }
@@ -622,6 +626,14 @@ class Binder : public cSimpleModule
     void moveUeCollector(MacNodeId ue, MacCellId oldCell, MacCellId newCell);
 
     RanNodeType getBaseStationTypeById(MacNodeId);
+
+    simtime_t getStartMECHostHandover () {
+        return startMECHostHandover;
+    }
+
+    void setStartMECHostHandover (simtime_t startTime) {
+        startMECHostHandover = startTime;
+    }
 
 };
 

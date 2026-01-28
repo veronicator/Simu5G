@@ -34,18 +34,34 @@ using namespace omnetpp;
 class ServiceRegistry;
 class MecOrchestrator;
 
-class MecPlatformManager : public cSimpleModule
+class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallback
 {
   protected:
     inet::ModuleRefByPar<MecOrchestrator> mecOrchestrator;
     inet::ModuleRefByPar<VirtualisationInfrastructureManager> vim;
     inet::ModuleRefByPar<ServiceRegistry> serviceRegistry;
 
+    inet::L3Address mepmAddress_;
+
+    inet::L3Address meoAddress_;   // destination IP address to connect to the UALCMP
+    int meoDestPort_;
+    inet::TcpSocket meoSocket_;
+
+    /* inet::TcpSocket::CallbackInterface callback methods */
+    void socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bool urgent) override;
+    void socketAvailable(inet::TcpSocket *socket, inet::TcpAvailableInfo *availableInfo) override { socket->accept(availableInfo->getNewSocketId()); }
+    void socketEstablished(inet::TcpSocket *socket) override {}
+    void socketPeerClosed(inet::TcpSocket *socket) override {}
+    void socketClosed(inet::TcpSocket *socket) override {}
+    void socketFailure(inet::TcpSocket *socket, int code) override {}
+    void socketStatusArrived(inet::TcpSocket *socket, inet::TcpStatusInfo *status) override {}
+    void socketDeleted(inet::TcpSocket *socket) override {}
+
   public:
 
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }
     void initialize(int stage) override;
-    void handleMessage(cMessage *msg) override {}
+    void handleMessage(cMessage *msg) override;
     void finish() override {}
 
     /* instantiating the requested MECApp
@@ -61,13 +77,14 @@ class MecPlatformManager : public cSimpleModule
      * is known at the MEC orchestrator (in the appDescriptor)
      */
     // instantiating the MEC app
-    MecAppInstanceInfo *instantiateMEApp(CreateAppMessage *msg);
+    MecAppInstanceInfo *instantiateMEApp(CreateAppMessage *msg);    // old version, to be removed after implementing everything
     bool instantiateEmulatedMEApp(CreateAppMessage *msg);
     // terminating the corresponding MEC app
     bool terminateMEApp(DeleteAppMessage *msg);
     bool terminateEmulatedMEApp(DeleteAppMessage *msg);
 
-    void migrateMEApps();
+    void migrateMEAppsReq();
+    void migrateMEApp(cMessage *msg);
 
     const std::vector<ServiceInfo> *getAvailableMecServices() const;
 
@@ -76,6 +93,10 @@ class MecPlatformManager : public cSimpleModule
      */
 
     void registerMecService(ServiceDescriptor&) const;
+
+    inet::L3Address getMepmAddress() {
+        return mepmAddress_;
+    }
 };
 
 } //namespace

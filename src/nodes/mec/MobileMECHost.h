@@ -32,11 +32,14 @@ using namespace omnetpp;
 
 class MobileMECHost: public cModule, public cListener {
 
-//    friend class LtePhyUe;
     friend class NRPhyUe;
-//    opp_component_ptr<cModule> vim;
 
-    bool doMigration = false;
+    //------------------------------------
+    //Binder module
+    inet::ModuleRefByPar<Binder> binder_;
+    //------------------------------------
+
+    bool isMobilityAware = false;
 public:
 
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }

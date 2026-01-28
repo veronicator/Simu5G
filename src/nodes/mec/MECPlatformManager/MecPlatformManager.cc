@@ -24,16 +24,129 @@ void MecPlatformManager::initialize(int stage)
     EV << "VirtualisationInfrastructureManager::initialize - stage " << stage << endl;
     cSimpleModule::initialize(stage);
     // avoid multiple initializations
-    if (stage != inet::INITSTAGE_LOCAL)
-        return;
-    vim.reference(this, "vimModule", true);
-    serviceRegistry.reference(this, "serviceRegistryModule", false);
+    if (stage == inet::INITSTAGE_LOCAL) {
+        vim.reference(this, "vimModule", true);
+        serviceRegistry.reference(this, "serviceRegistryModule", false);
 
-    mecOrchestrator.reference(this, "mecOrchestrator", false);
-    if (!mecOrchestrator) {
-        EV << "MecPlatformManager::initialize - MEC Orchestrator [" << par("mecOrchestrator").str() << "] not found" << endl;
+        mecOrchestrator.reference(this, "mecOrchestrator", false);
+        if (!mecOrchestrator) {
+            EV << "MecPlatformManager::initialize - MECOrchestrator [" << par("mecOrchestrator").str() << "] not found" << endl;
+        }
+    }
+    else if (stage == inet::INITSTAGE_APPLICATION_LAYER) {
+        mepmAddress_ = inet::L3AddressResolver().addressOf(getContainingNode(this));
+
+        const char *localAddressStr = par("localAddress");
+        inet::L3Address localAddress = *localAddressStr ? inet::L3AddressResolver().resolve(localAddressStr) : inet::L3Address();
+
+        // setup socket with the MECOrchestrator
+        meoSocket_.setOutputGate(gate("socketOut"));
+        meoSocket_.bind(localAddress, par("meoLocalPort").intValue());
+        meoSocket_.setCallback(this);
+        const char *meoAddress = par("meoAddress").stringValue();
+        meoAddress_ = inet::L3AddressResolver().resolve(meoAddress);
+        meoDestPort_ = par("meoDestPort");
+
+        int timeToLive = par("timeToLive");
+        if (timeToLive != -1) {
+            meoSocket_.setTimeToLive(timeToLive);
+        }
+
+        int dscp = par("dscp");
+        if (dscp != -1) {
+            meoSocket_.setDscp(dscp);
+        }
+
+        int tos = par("tos");
+        if (tos != -1) {
+            meoSocket_.setTos(tos);
+        }
+        if (meoAddress_.isUnspecified()) {
+            EV_ERROR << "Connecting to " << meoAddress_ << " port=" << meoDestPort_ << ": cannot resolve destination address\n";
+            throw cRuntimeError("MecOrchestrator proxy address is unspecified!");
+        }
+        else {
+            EV << "Connecting to " << meoAddress_ << " port=" << meoDestPort_ << endl;
+            meoSocket_.connect(meoAddress_, meoDestPort_);
+        }
+
     }
 }
+
+
+void MecPlatformManager::handleMessage(cMessage *msg)
+{
+    if (!msg->isSelfMessage()) {
+        if (meoSocket_.belongsToSocket(msg)) {
+            meoSocket_.processMessage(msg);
+        }
+        else {
+            EV_ERROR << "message " << msg->getFullName() << "(" << msg->getClassName() << ") arrived for unknown socket \n";
+            delete msg;
+        }
+    }
+}
+
+void MecPlatformManager::socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bool urgent) {
+    // socket messages from MEO
+    auto meoMsg = msg->peekAtFront<MECAppMessage>();
+    if (!strcmp(meoMsg->getType(), MIGRATE_MEAPP))
+        migrateMEApp(msg);
+    /*  // todo gestire casi start / stop
+     * else if (!strcmp(meoMsg->getType(), STOP_MEAPP))
+        handleMigrateAppAck(msg);
+    */
+    else {
+        EV << "MecPlatformManager::socketDataArrived - Unexpected type data: " << meoMsg->getType() << endl;
+    }
+}
+
+
+//void MecPlatformManager::socketPeerClosed(inet::TcpSocket *socket)
+//{
+//    EV << "MecPlatformManager::socketPeerClosed" << endl;
+//    if (meoSocket_.getState() == inet::TcpSocket::PEER_CLOSED) {
+//        EV_INFO << "remote TCP closed, closing here as well\n";
+//        meoSocket_.close();
+//    }
+//}
+
+// instancing the requested MECApp (called by handleResource)
+void MecPlatformManager::migrateMEApp(cMessage *msg)
+{
+    Enter_Method_Silent("MecPlatformManager::migrateMEApp");
+
+    EV << "MEPM::migrateMECApp" << endl;
+
+    inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
+    auto meoMsg = pkt->removeAtFront<CreateAppMessage>();
+    int contextId = meoMsg->getContextId();
+
+    MecAppInstanceInfo *res = vim->instantiateMEApp(meoMsg.get());
+
+    auto migrateAckMsg = inet::makeShared<MigrateAppAckMessage>();
+    migrateAckMsg->setType(ACK_MIGRATE_MEAPP);
+    migrateAckMsg->setContextId(contextId);
+    migrateAckMsg->setStatus(res->status);
+    migrateAckMsg->setInstanceId(res->instanceId.c_str());
+    migrateAckMsg->setEndPointAddr(res->endPoint.addr.str().c_str());
+    migrateAckMsg->setEndPointPort(res->endPoint.port);
+    migrateAckMsg->setModuleId(res->reference->getId());
+
+    migrateAckMsg->setMepmId(getId());
+    migrateAckMsg->setMepmAddress(mepmAddress_.str().c_str());
+
+    inet::B msgSize = inet::B(50 + strlen(migrateAckMsg->getType()) + strlen(migrateAckMsg->getMepmAddress())
+            + strlen(migrateAckMsg->getInstanceId()) + strlen(migrateAckMsg->getEndPointAddr()));
+
+    migrateAckMsg->setChunkLength(msgSize);
+    inet::Packet *newPkt = new inet::Packet("MigrateAppAckMessage");
+    newPkt->insertAtBack(migrateAckMsg);
+    meoSocket_.send(newPkt);
+
+    delete msg;
+}
+
 
 // instancing the requested MECApp (called by handleResource)
 MecAppInstanceInfo *MecPlatformManager::instantiateMEApp(CreateAppMessage *msg)
@@ -65,11 +178,25 @@ bool MecPlatformManager::terminateMEApp(DeleteAppMessage *msg)
     return res;
 }
 
-void MecPlatformManager::migrateMEApps() {
-    if (mecOrchestrator != nullptr) {
-        mecOrchestrator->doMigrations(this->getId());
-//        vim->terminateAllMEApps();
-    }
+void MecPlatformManager::migrateMEAppsReq()
+{
+    Enter_Method_Silent("MecPlatformManager::migrateMEAppsReq");
+
+    inet::Packet *newPkt = new inet::Packet("MigrateAppMessage");
+    auto migrateMsgReq = inet::makeShared<MigrateAppMessage>();
+    migrateMsgReq->setType(MIGRATE_MEAPP_REQ);
+    migrateMsgReq->setMepmAddress(mepmAddress_.str().c_str());
+    migrateMsgReq->setMepmId(getId());
+    inet::B msgSize = inet::B(40 + strlen(migrateMsgReq->getType()) + strlen(migrateMsgReq->getMepmAddress()));
+    migrateMsgReq->setChunkLength(msgSize);
+
+    newPkt->insertAtBack(migrateMsgReq);
+    meoSocket_.send(newPkt);
+
+//    if (mecOrchestrator != nullptr) {
+//        mecOrchestrator->migrateMECApps(this->getId());
+////        vim->terminateAllMEApps();
+//    }
 }
 
 const std::vector<ServiceInfo> *MecPlatformManager::getAvailableMecServices() const

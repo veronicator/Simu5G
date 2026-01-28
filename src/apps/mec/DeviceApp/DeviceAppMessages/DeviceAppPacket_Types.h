@@ -14,6 +14,7 @@
 
 #define START_MECAPP        "MecAppStart"
 #define STOP_MECAPP         "MecAppStop"
+#define MIGRATE_MECAPP      "MecAppMigrate"
 
 #define ACK_START_MECAPP    "MecAppStartAck"
 #define ACK_STOP_MECAPP     "MecAppStopAck"

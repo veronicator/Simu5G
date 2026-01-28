@@ -53,7 +53,7 @@ class UALCMPApp : public MecServiceBase
     std::map<unsigned int, LcmRequestStatus> pendingRequests;
 
     // map to store ueAppId and the corresponding socketId <ueAppId, socketId>
-    std::map<int, int> ueSockets;
+    std::map<int, int> ueSockets_;
 
   public:
     UALCMPApp();

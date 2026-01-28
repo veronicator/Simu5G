@@ -19,8 +19,6 @@
 #include "nodes/mec/MECPlatform/ServiceRegistry/ServiceRegistry.h"
 #include "apps/mec/MecApps/MultiUEMECApp.h"
 
-#include "nodes/mec/MECOrchestrator/MECOMessages/MECOrchestratorMessages_m.h"
-
 #include "nodes/mec/UALCMP/UALCMPMessages/UALCMPMessages_m.h"
 #include "nodes/mec/UALCMP/UALCMPMessages/UALCMPMessages_types.h"
 #include "nodes/mec/UALCMP/UALCMPMessages/CreateContextAppMessage.h"
@@ -43,30 +41,49 @@ void MecOrchestrator::initialize(int stage)
 {
     cSimpleModule::initialize(stage);
     // Avoid multiple initializations
-    if (stage != inet::INITSTAGE_LOCAL)
-        return;
-    EV << "MecOrchestrator::initialize - stage " << stage << endl;
+    if (stage == inet::INITSTAGE_LOCAL) {
+//        return;
+        EV << "MecOrchestrator::initialize - stage " << stage << endl;
 
-    binder_.reference(this, "binderModule", true);
+        binder_.reference(this, "binderModule", true);
 
-    const char *selectionPolicyPar = par("selectionPolicy");
-    if (!strcmp(selectionPolicyPar, "MecServiceBased"))
-        mecHostSelectionPolicy_ = new MecServiceSelectionBased(this);
-    else if (!strcmp(selectionPolicyPar, "AvailableResourcesBased"))
-        mecHostSelectionPolicy_ = new AvailableResourcesSelectionBased(this);
-    else if (!strcmp(selectionPolicyPar, "MecHostBased"))
-        mecHostSelectionPolicy_ = new MecHostSelectionBased(this, par("mecHostIndex"));
-    else if (!strcmp(selectionPolicyPar, "MigrationSelectionBased"))
-        mecHostSelectionPolicy_ = new MigrationMecServiceSelectionBased(this);
-    else
-        throw cRuntimeError("MecOrchestrator::initialize - Selection policy '%s' not present!", selectionPolicyPar);
+        const char *selectionPolicyPar = par("selectionPolicy");
+        if (!strcmp(selectionPolicyPar, "MecServiceBased"))
+            mecHostSelectionPolicy_ = new MecServiceSelectionBased(this);
+        else if (!strcmp(selectionPolicyPar, "AvailableResourcesBased"))
+            mecHostSelectionPolicy_ = new AvailableResourcesSelectionBased(this);
+        else if (!strcmp(selectionPolicyPar, "MecHostBased"))
+            mecHostSelectionPolicy_ = new MecHostSelectionBased(this, par("mecHostIndex"));
+        else if (!strcmp(selectionPolicyPar, "MigrationSelectionBased"))
+            mecHostSelectionPolicy_ = new MigrationMecServiceSelectionBased(this);
+        else
+            throw cRuntimeError("MecOrchestrator::initialize - Selection policy '%s' not present!", selectionPolicyPar);
 
-    onboardingTime = par("onboardingTime").doubleValue();
-    instantiationTime = par("instantiationTime").doubleValue();
-    terminationTime = par("terminationTime").doubleValue();
+        onboardingTime = par("onboardingTime").doubleValue();
+        instantiationTime = par("instantiationTime").doubleValue();
+        terminationTime = par("terminationTime").doubleValue();
 
-    getConnectedMecHosts();
-    onboardApplicationPackages();
+        getConnectedMecHosts();
+        onboardApplicationPackages();
+    }
+    else if (stage == inet::INITSTAGE_APPLICATION_LAYER) {
+        EV << "MecOrchestrator::initialize - stage " << stage << endl;
+        const char *localAddress = par("localAddress");
+        int localPort = par("localPort");
+        EV << "Local Address: " << localAddress << " port: " << localPort << endl;
+        inet::L3Address localAdd(inet::L3AddressResolver().resolve(localAddress));
+        EV << "Local Address resolved: " << localAdd << endl;
+
+        serverSocket.setOutputGate(gate("socketOut"));
+        serverSocket.setCallback(this);
+        serverSocket.bind(inet::L3Address(), localPort); // bind socket for any address
+
+        int tos = par("tos");
+        if (tos != -1)
+            serverSocket.setTos(tos);
+
+        serverSocket.listen();
+    }
 }
 
 void MecOrchestrator::handleMessage(cMessage *msg)
@@ -93,8 +110,54 @@ void MecOrchestrator::handleMessage(cMessage *msg)
         EV << "MecOrchestrator::handleMessage - " << msg->getName() << endl;
         handleUALCMPMessage(msg);
     }
+    else {
+        EV << "MecOrchestrator::handleMessage from socket" << endl;
+        inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(sockets_.findSocketFor(msg));
+        if (socket)
+            socket->processMessage(msg);
+        else if (serverSocket.belongsToSocket(msg))
+            serverSocket.processMessage(msg);
+        else {
+            EV_ERROR << "message " << msg->getFullName() << "(" << msg->getClassName() << ") arrived for unknown socket \n";
+            delete msg;
+        }
+    }
+}
 
-    delete msg;
+void MecOrchestrator::socketAvailable(inet::TcpSocket *socket, inet::TcpAvailableInfo *availableInfo)
+{
+    // new TCP connection -- create new socket object
+    inet::TcpSocket *newSocket = new inet::TcpSocket(availableInfo);
+    newSocket->setOutputGate(gate("socketOut"));
+
+    newSocket->setCallback(this);
+
+    sockets_.addSocket(newSocket);
+    EV << "New socket added - [" << newSocket->getRemoteAddress() << ":" << newSocket->getRemotePort() << " connId: " << newSocket->getSocketId() << "]" << endl;
+
+    socket->accept(availableInfo->getNewSocketId());
+}
+
+void MecOrchestrator::socketEstablished(inet::TcpSocket *socket) {
+    inet::L3Address remoteAddress = socket->getRemoteAddress();     // get the remoteAddress used as key in the  map mepmSockets_
+    mepmSockets_[remoteAddress] = socket->getSocketId();
+}
+
+void MecOrchestrator::socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bool urgent) {
+    // todo: gestire i diversi tipi di messaggi Create | Delete | Migrate + ack msg
+    EV << "MecOrchestrator::socketDataArrived - received packet" << endl;
+    // from mepm -> migrateMsg
+    auto mepmMsg = msg->peekAtFront<MECAppMessage>();
+
+    if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPP_REQ)) {
+        migrateMECApps(msg);
+    }
+    else if (!strcmp(mepmMsg->getType(), ACK_MIGRATE_MEAPP))
+        handleMigrateAppAck(msg);
+    else {
+        EV << "MecOrchestrator::socketDataArrived - Unexpected type data: " << mepmMsg->getType() << endl;
+    }
+
 }
 
 void MecOrchestrator::handleUALCMPMessage(cMessage *msg)
@@ -330,22 +393,26 @@ void MecOrchestrator::stopMECApp(UALCMPMessage *msg) {
     scheduleAt(simTime() + processingTime, mecoMsg);
 }
 
-void MecOrchestrator::doMigrations(int oldMepmId) {
-    Enter_Method_Silent("MecOrchestrator::doMigrations");
+void MecOrchestrator::migrateMECApps(cMessage *msg) {
+    Enter_Method_Silent("MecOrchestrator::migrateMECApps");
+
+    EV << "MecOrchestrator::migrateMECApps" << endl;
+
+    inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
+    auto mepmMsg = pkt->peekAtFront<MigrateAppMessage>();
+    int mepmId = mepmMsg->getMepmId();
 
     MigrationMecServiceSelectionBased *migrationSelectionPolicy = dynamic_cast<MigrationMecServiceSelectionBased *> (mecHostSelectionPolicy_);
     for (const auto& contextApp : meAppMap) {
-        if (contextApp.second.mecpm->getId() == oldMepmId) {
-//            std::cout << "MEO doMigrations" << endl;
+        if (contextApp.second.mecpm->getId() == mepmId) {
 
             auto oldMecApp = contextApp.second;
             int contextId = oldMecApp.contextId;
-            double processingTime = 0.0;
 
             auto it = mecApplicationDescriptors_.find(oldMecApp.appDId);
             if (it == mecApplicationDescriptors_.end()) {
                 // this should not happen bc the appDid is in the mecAppMap, so the mecApp is already instantiated at least once
-                EV << "MecOrchestrator::doMigration - Application package with AppDId[" << oldMecApp.appDId << "] not onboarded." << endl;
+                EV << "MecOrchestrator::migrateMECApps - Application package with AppDId[" << oldMecApp.appDId << "] not onboarded." << endl;
 //                sendCreateAppContextAck(false, contAppMsg->getRequestId());
                 continue;
             }
@@ -355,7 +422,8 @@ void MecOrchestrator::doMigrations(int oldMepmId) {
             cModule *bestHost = migrationSelectionPolicy->findNewBestMecHost(desc, mecHostName);
 
             if (bestHost != nullptr) {
-                CreateAppMessage *createAppMsg = new CreateAppMessage();
+                auto createAppMsg = inet::makeShared<CreateAppMessage>();
+                createAppMsg->setType(MIGRATE_MEAPP);
 
                 createAppMsg->setUeAppID(oldMecApp.mecUeAppID);
                 createAppMsg->setMEModuleName(desc.getAppName().c_str());
@@ -376,6 +444,16 @@ void MecOrchestrator::doMigrations(int oldMepmId) {
 
                 createAppMsg->setContextId(contextId);
 
+                inet::B msgSize = inet::B(80 + strlen(createAppMsg->getType()) + strlen(createAppMsg->getSourceAddress())
+                        + strlen(createAppMsg->getDestinationAddress()) + strlen(createAppMsg->getDestinationMecAppAddress()) + strlen(createAppMsg->getMEModuleType())
+                        + strlen(createAppMsg->getMEModuleName()) + strlen(createAppMsg->getRequiredService()) + strlen(createAppMsg->getProvidedService()));
+                createAppMsg->setChunkLength(msgSize);
+
+                // create pkt to send through socket to the mepm on the new mec host
+                inet::Packet *newPkt = new inet::Packet("CreateAppMessage");   // new app creation
+                newPkt->insertAtBack(createAppMsg);
+
+
                 // Add the new MEC app in the map structure
                 mecAppMapEntry newMecApp;
                 newMecApp.appDId = oldMecApp.appDId;
@@ -386,68 +464,20 @@ void MecOrchestrator::doMigrations(int oldMepmId) {
                 newMecApp.mecpm = bestHost->getSubmodule("mecPlatformManager");
 
                 newMecApp.mecAppName = desc.getAppName().c_str();
+
+                tmpMeAppMap[contextId] = newMecApp;
+
                 MecPlatformManager *mecpm = check_and_cast<MecPlatformManager *>(newMecApp.mecpm);
 
-                /*
-                 * If the application descriptor refers to a simulated MEC app, the system eventually instantiates the MEC app object.
-                 * If the application descriptor refers to a MEC application running outside the simulator, i.e., emulation mode,
-                 * the system allocates the resources without instantiating any module.
-                 * The application descriptor contains the address and port information to communicate with the MEC application.
-                 */
+                inet::L3Address mepmAddress = mecpm->getMepmAddress();
+                int sockId = mepmSockets_[mepmAddress];
+                inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(sockets_.getSocketById(sockId));
 
-                MecAppInstanceInfo *appInfo = nullptr;
-
-                if (desc.isMecAppEmulated()) {
-                    EV << "MecOrchestrator::doMigration - MEC app is emulated" << endl;
-                    bool result = mecpm->instantiateEmulatedMEApp(createAppMsg);
-                    appInfo = new MecAppInstanceInfo();
-                    appInfo->status = result;
-                    appInfo->endPoint.addr = inet::L3Address(desc.getExternalAddress().c_str());
-                    appInfo->endPoint.port = desc.getExternalPort();
-                    appInfo->instanceId = "emulated_" + desc.getAppName();
-                    newMecApp.isEmulated = true;
-                }
-                else {
-                    appInfo = mecpm->instantiateMEApp(createAppMsg);
-                    newMecApp.isEmulated = false;
-                }
-
-                if (!appInfo->status) {
-                    EV << "MecOrchestrator::doMigration - something went wrong during MEC app instantiation" << endl;
-                    MECOrchestratorMessage *msg = new MECOrchestratorMessage("MECOrchestratorMessage");
-                    msg->setType(MIGRATE_CONTEXT_APP);
-                    // requestId field used to send the ueAppID of interest to UALCMP
-                    msg->setRequestId(newMecApp.mecUeAppID);
-                    msg->setSuccess(false);
-                    processingTime += instantiationTime;
-                    scheduleAt(simTime() + processingTime, msg);
-                    return;
-                }
-
-                EV << "MecOrchestrator::doMigration - new MEC application with name: " << appInfo->instanceId << " instantiated on MEC host []" << newMecApp.mecHost << " at " << appInfo->endPoint.addr.str() << ":" << appInfo->endPoint.port << endl;
-
-                newMecApp.mecAppAddress = appInfo->endPoint.addr;
-                newMecApp.mecAppPort = appInfo->endPoint.port;
-                newMecApp.mecAppInstanceId = appInfo->instanceId;
-                newMecApp.contextId = contextId;
-                newMecApp.reference = appInfo->reference;
-                meAppMap[contextId] = newMecApp;
-
-                MECOrchestratorMessage *msg = new MECOrchestratorMessage("MECOrchestratorMessage");
-                msg->setContextId(contextId);
-                msg->setType(MIGRATE_CONTEXT_APP);
-                // requestId field used to send the ueAppID of interest to UALCMP
-                msg->setRequestId(newMecApp.mecUeAppID);
-                msg->setSuccess(true);
-
-                processingTime += instantiationTime;
-                scheduleAt(simTime() + processingTime, msg);
-
-                delete appInfo;
+                socket->send(newPkt);
             }
             else {
                 // throw cRuntimeError("MecOrchestrator::startMECApp - A suitable MEC host has not been selected");
-                EV << "MecOrchestrator::diMigration - A suitable MEC host has not been selected" << endl;
+                EV << "MecOrchestrator::migrateMECApps - A suitable MEC host has not been selected" << endl;
 //                MECOrchestratorMessage *msg = new MECOrchestratorMessage("MECOrchestratorMessage");
 //                msg->setType(MIGRATE_CONTEXT_APP);
 //                // requestId field used to send the ueAppID of interest to UALCMP
@@ -500,6 +530,96 @@ void MecOrchestrator::sendCreateAppContextAck(bool result, unsigned int requestS
         ack->setSuccess(false);
     }
     send(ack, "toUALCMP");
+}
+
+void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
+{
+    EV << "MecOrchestrator::handleMigrateAppAck" << endl;
+
+    inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
+    auto mepmMsg = pkt->peekAtFront<MigrateAppAckMessage>();
+    int contextId = mepmMsg->getContextId();
+    EV << "MecOrchestrator::handleMigrateAppAck - processing contextId: " << contextId << endl;
+    // Checking if contextId To tmpMeAppMapKey entry map does exist
+    if (tmpMeAppMap.empty() || (tmpMeAppMap.find(contextId) == tmpMeAppMap.end())) {
+        // Maybe it has already been migrated
+        EV << "MecOrchestrator::handleMigrateAppAck - \tWARNING MEC Application [" << tmpMeAppMap[contextId].mecUeAppID << "] not found!" << endl;
+//        sendDeleteAppContextAck(false, contAppMsg->getRequestId(), contextId);
+        return;
+    }
+    auto tmpMecApp = tmpMeAppMap[contextId];
+    double processingTime = 0.0;
+
+    auto it = mecApplicationDescriptors_.find(tmpMecApp.appDId);
+    if (it == mecApplicationDescriptors_.end()) {
+        // this should not happen bc the appDid is in the mecAppMap, so the mecApp is already instantiated at least once
+        EV << "MecOrchestrator::handleMigrateAppAck - Application package with AppDId[" << tmpMecApp.appDId << "] not onboarded." << endl;
+
+        return;
+    }
+
+    const ApplicationDescriptor& desc = it->second;
+    /*
+      * If the application descriptor refers to a simulated MEC app, the system eventually instantiates the MEC app object.
+      * If the application descriptor refers to a MEC application running outside the simulator, i.e., emulation mode,
+      * the system allocates the resources without instantiating any module.
+      * The application descriptor contains the address and port information to communicate with the MEC application.
+      */
+
+     MecAppInstanceInfo *appInfo = new MecAppInstanceInfo();
+     appInfo->status = mepmMsg->getStatus();
+
+     if (desc.isMecAppEmulated()) {
+         EV << "MecOrchestrator::handleMigrateAppAck - MEC app is emulated" << endl;
+         appInfo->endPoint.addr = inet::L3Address(desc.getExternalAddress().c_str());
+         appInfo->endPoint.port = desc.getExternalPort();
+         appInfo->instanceId = "emulated_" + desc.getAppName();
+         tmpMecApp.isEmulated = true;
+     }
+     else {
+         appInfo->endPoint.addr = inet::L3Address(mepmMsg->getEndPointAddr());
+         appInfo->endPoint.port = mepmMsg->getEndPointPort();
+         appInfo->instanceId = mepmMsg->getInstanceId();
+         appInfo->reference = getSimulation()->getModule(mepmMsg->getModuleId());
+         tmpMecApp.isEmulated = false;
+     }
+
+     if (!appInfo->status) {
+        EV << "MecOrchestrator::handleMigrateAppAck - something went wrong during MEC app instantiation" << endl;
+         MECOrchestratorMessage *meoMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
+         meoMsg->setType(MIGRATE_CONTEXT_APP);
+         // requestId field used to send the ueAppID of interest to UALCMP
+         meoMsg->setRequestId(tmpMecApp.mecUeAppID);
+         meoMsg->setSuccess(false);
+         processingTime += instantiationTime;
+         scheduleAt(simTime() + processingTime, meoMsg);
+
+         return;
+     }
+
+     delete pkt;
+
+     EV << "MecOrchestrator::handleMigrateAppAck - new MEC application with name: " << appInfo->instanceId << " instantiated on MEC host []" << tmpMecApp.mecHost << " at " << appInfo->endPoint.addr.str() << ":" << appInfo->endPoint.port << endl;
+
+     tmpMecApp.mecAppAddress = appInfo->endPoint.addr;
+     tmpMecApp.mecAppPort = appInfo->endPoint.port;
+     tmpMecApp.mecAppInstanceId = appInfo->instanceId;
+     tmpMecApp.contextId = contextId;
+     tmpMecApp.reference = appInfo->reference;
+     meAppMap[contextId] = tmpMecApp;
+
+     MECOrchestratorMessage *meoMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
+     meoMsg->setContextId(contextId);
+     meoMsg->setType(MIGRATE_CONTEXT_APP);
+     // requestId field used to send the ueAppID of interest to UALCMP
+     meoMsg->setRequestId(tmpMecApp.mecUeAppID);
+     meoMsg->setSuccess(true);
+
+     processingTime += instantiationTime;
+     scheduleAt(simTime() + processingTime, meoMsg);
+
+     delete appInfo;
+
 }
 
 void MecOrchestrator::sendMigrateAppContextAck(bool result, int ueAppId, int contextId)

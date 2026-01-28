@@ -22,9 +22,23 @@ package simu5g.nodes.mec.MECPlatformManager;
 simple MecPlatformManager
 {
     parameters:
+        string meoAddress = default("mecOrchestrator");  // MECOrchestrator connect address to connect to, may be left empty ("")
+        int meoDestPort = default(1000);    // MECOrchestrator port number to connect to
+        int meoLocalPort = default(5000); // MECOrchestrator local port number
+
+        string localAddress = default(""); // local address: may be left empty ("")
+        int localPort = default(-1); // localPort number to listen on
+        int timeToLive = default(-1); // if not -1, set the TTL (IPv4) or Hop Limit (IPv6) field of sent packets to this value
+        int dscp = default(-1); // if not -1, set the DSCP (IPv4/IPv6) field of sent packets to this value
+        int tos = default(-1); // if not -1, set the Type Of Service (IPv4) / Traffic Class (IPv6) field of sent packets to this value
+
         string mecOrchestrator;
         string serviceRegistryModule = default("^.mecPlatform.serviceRegistry");
         string vimModule = default("^.vim");
         @display("i=block/control");
+
+    gates:
+        output socketOut;
+        input socketIn;
 }
 

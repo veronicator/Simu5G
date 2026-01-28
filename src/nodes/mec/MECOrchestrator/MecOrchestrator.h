@@ -21,8 +21,10 @@
 #include "common/LteCommon.h"
 #include "common/binder/Binder.h"           //to handle cars dynamically leaving the Network
 #include "nodes/mec/MECOrchestrator/ApplicationDescriptor/ApplicationDescriptor.h"
+#include "nodes/mec/MECOrchestrator/MECOMessages/MECOrchestratorMessages_m.h"
 #include "nodes/mec/MECPlatform/MEAppPacket_m.h"
 #include "nodes/mec/MECPlatform/MEAppPacket_Types.h"
+#include "nodes/mec/MECPlatform/MECServices/MECServiceBase/MecServiceBase.h"
 #include "nodes/mec/utils/MecCommon.h"
 
 namespace simu5g {
@@ -70,7 +72,7 @@ class SelectionPolicyBase;
 //   - MEC app run-time onboarding
 //
 
-class MecOrchestrator : public cSimpleModule
+class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
 {
     // Selection Policies modules access grants
     friend class SelectionPolicyBase;
@@ -86,12 +88,18 @@ class MecOrchestrator : public cSimpleModule
     inet::ModuleRefByPar<Binder> binder_;
     //------------------------------------
 
+    inet::TcpSocket serverSocket; // Used to listen to incoming connections
+    inet::SocketMap sockets_;   // stores connections
+    std::map<inet::L3Address, int> mepmSockets_;    // map<mepmAddress, socketId>
+
     //parent modules
     std::vector<cModule *> mecHosts;
 
     //storing the UEApp and MEApp information
     //key = contextId - value mecAppMapEntry
     std::map<int, mecAppMapEntry> meAppMap;
+    //temporary MECAppMap used during migration process
+    std::map<int, mecAppMapEntry> tmpMeAppMap;
     std::map<std::string, ApplicationDescriptor> mecApplicationDescriptors_;
 
     // next context id to be assigned to new MEC apps
@@ -113,8 +121,6 @@ class MecOrchestrator : public cSimpleModule
      */
     void registerMecService(ServiceDescriptor&) const;
 
-    void doMigrations(int mepmId);
-
   protected:
 
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }
@@ -132,6 +138,9 @@ class MecOrchestrator : public cSimpleModule
     // it calls the method of the MEC platform manager of the MEC host where the MEC app has been deployed
     // to delete the MEC app
     void stopMECApp(UALCMPMessage *msg);
+
+    void migrateMECApps(cMessage *msg);
+    void handleMigrateAppAck(cMessage *msg);
 
     // sending ACK_CREATE_CONTEXT_APP or ACK_DELETE_CONTEXT_APP
     void sendCreateAppContextAck(bool result, unsigned int requestSno, int contextId = -1);
@@ -175,6 +184,16 @@ class MecOrchestrator : public cSimpleModule
      * @return ApplicationDescriptor structure of the MEC app descriptor
      */
     const ApplicationDescriptor& onboardApplicationPackage(const char *fileName);
+
+    /* inet::TcpSocket::CallbackInterface callback methods */
+    void socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bool urgent) override;
+    void socketAvailable(inet::TcpSocket *socket, inet::TcpAvailableInfo *availableInfo) override;
+    void socketEstablished(inet::TcpSocket *socket) override;
+    void socketPeerClosed(inet::TcpSocket *socket) override {}
+    void socketClosed(inet::TcpSocket *socket) override {}
+    void socketFailure(inet::TcpSocket *socket, int code) override {}
+    void socketStatusArrived(inet::TcpSocket *socket, inet::TcpStatusInfo *status) override {}
+    void socketDeleted(inet::TcpSocket *socket) override {}
 };
 
 } //namespace

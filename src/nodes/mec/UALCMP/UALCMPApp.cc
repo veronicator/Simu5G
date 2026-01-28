@@ -194,11 +194,11 @@ void UALCMPApp::handleMigrateContextAppAckMessage(UALCMPMessage *msg)
 
     nlohmann::json jsonBody;
 
-    if(ueSockets.empty() || ueSockets.find(ueAppId) == ueSockets.end()) {
+    if(ueSockets_.empty() || ueSockets_.find(ueAppId) == ueSockets_.end()) {
         EV << "UALCMPApp::handleMigrateContextAppAckMessage - ERROR ueAppId: " << ueAppId << " does not exist in ueSockets map \n\t this should not happen" << endl;
         return;
     }
-    int sockId = ueSockets[ueAppId];
+    int sockId = ueSockets_[ueAppId];
     inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(socketMap.getSocketById(sockId));
 
     if (socket) {
@@ -322,7 +322,7 @@ void UALCMPApp::handlePOSTRequest(const HttpRequestMessage *currentRequestMessag
 
             // Retrieve UE App ID for mapping ueAppId to socketId
             int ueAppID = atoi(createContext->getDevAppId());
-            ueSockets[ueAppID] = socket->getSocketId();
+            ueSockets_[ueAppID] = socket->getSocketId();
 
             EV << "POST request number: " << requestSno << " related to connId: " << socket->getSocketId() << endl;
 

@@ -27,22 +27,25 @@ void MobileMECHost::initialize(int stage)
 {
     cModule::initialize(stage);
 
+    if (stage == inet::INITSTAGE_LOCAL)
+        binder_.reference(this, "binderModule", true);
+
     // avoid multiple initializations
-    if (stage == inet::INITSTAGE_APPLICATION_LAYER) {
+    else if (stage == inet::INITSTAGE_APPLICATION_LAYER) {
         subscribe(NRPhyUe::handoverServingCellSignal_, this);
     }
 }
 
 void MobileMECHost::receiveSignal(cComponent *source, simsignal_t signalID, intval_t value, cObject *)
 {
-//    std::cout << "receive signal mec host" << endl;
-    if (hasPar("doMigration")) {
-        doMigration = par("doMigration").boolValue();
+    if (hasPar("isMobilityAware")) {
+        isMobilityAware = par("isMobilityAware").boolValue();
     }
+
     MecPlatformManager *mepm = check_and_cast<MecPlatformManager *>(this->getSubmodule("mecPlatformManager"));
-    if (doMigration && signalID == NRPhyUe::handoverServingCellSignal_) {
-//        std::cout << "receiveSignal servingCellSignal_: " << signalID << endl;
-        mepm->migrateMEApps();
+    if (isMobilityAware && signalID == NRPhyUe::handoverServingCellSignal_) {
+        binder_->setStartMECHostHandover(simTime());
+        mepm->migrateMEAppsReq();
     }
 }
 
