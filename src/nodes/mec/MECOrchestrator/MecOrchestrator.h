@@ -123,6 +123,8 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
 
   protected:
 
+    std::map<int, inet::ChunkQueue> socketQueue;
+
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }
     void initialize(int stage) override;
     void handleMessage(cMessage *msg) override;

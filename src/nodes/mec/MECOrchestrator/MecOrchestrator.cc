@@ -146,18 +146,26 @@ void MecOrchestrator::socketEstablished(inet::TcpSocket *socket) {
 void MecOrchestrator::socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bool urgent) {
     // todo: gestire i diversi tipi di messaggi Create | Delete | Migrate + ack msg
     EV << "MecOrchestrator::socketDataArrived - received packet" << endl;
-    // from mepm -> migrateMsg
-    auto mepmMsg = msg->peekAtFront<MECAppMessage>();
 
-    if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPP_REQ)) {
-        migrateMECApps(msg);
-    }
-    else if (!strcmp(mepmMsg->getType(), ACK_MIGRATE_MEAPP))
-        handleMigrateAppAck(msg);
-    else {
-        EV << "MecOrchestrator::socketDataArrived - Unexpected type data: " << mepmMsg->getType() << endl;
-    }
+    if (msg->getKind() == TCP_I_DATA || msg->getKind() == TCP_I_URGENT_DATA) {
+        inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
+        int connId = socket->getSocketId(); //packet->getTag<SocketInd>()->getSocketId();
+        ChunkQueue& queue = socketQueue[connId];
+        auto chunk = packet->peekDataAt(B(0), packet->getTotalLength());
+        queue.push(chunk);
 
+        while (queue.has<MECAppMessage>(b(-1))) {
+            auto mepmMsg = queue.pop<MECAppMessage>(b(-1));
+            // from mepm -> migrateMsg
+            if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPP_REQ)) {
+                migrateMECApps(new Packet("MigrateAppMessage", mepmMsg));
+            }
+            else if (!strcmp(mepmMsg->getType(), ACK_MIGRATE_MEAPP))
+                handleMigrateAppAck(new Packet("MigrateAppAckMessage", mepmMsg));
+            else
+                EV << "MecOrchestrator::socketDataArrived - Unexpected type data: " << mepmMsg->getType() << endl;
+        }
+    }
 }
 
 void MecOrchestrator::handleUALCMPMessage(cMessage *msg)

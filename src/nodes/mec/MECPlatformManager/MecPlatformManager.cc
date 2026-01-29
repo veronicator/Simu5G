@@ -12,7 +12,6 @@
 #include "nodes/mec/MECPlatformManager/MecPlatformManager.h"
 #include "nodes/mec/MECOrchestrator/MecOrchestrator.h"
 
-#include "nodes/mec/MECOrchestrator/MECOMessages/MECOrchestratorMessages_m.h"
 
 namespace simu5g {
 
@@ -89,15 +88,25 @@ void MecPlatformManager::handleMessage(cMessage *msg)
 
 void MecPlatformManager::socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bool urgent) {
     // socket messages from MEO
-    auto meoMsg = msg->peekAtFront<MECAppMessage>();
-    if (!strcmp(meoMsg->getType(), MIGRATE_MEAPP))
-        migrateMEApp(msg);
-    /*  // todo gestire casi start / stop
-     * else if (!strcmp(meoMsg->getType(), STOP_MEAPP))
-        handleMigrateAppAck(msg);
-    */
-    else {
-        EV << "MecPlatformManager::socketDataArrived - Unexpected type data: " << meoMsg->getType() << endl;
+    if (msg->getKind() == TCP_I_DATA || msg->getKind() == TCP_I_URGENT_DATA) {
+        inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
+        int connId = socket->getSocketId(); //packet->getTag<SocketInd>()->getSocketId();
+        ChunkQueue& queue = socketQueue[connId];
+        auto chunk = packet->peekDataAt(B(0), packet->getTotalLength());
+        queue.push(chunk);
+
+        while (queue.has<MECAppMessage>(b(-1))) {
+            auto meoMsg = queue.pop<MECAppMessage>(b(-1));
+//            auto meMsg = msg->peekAtFront<MECAppMessage>();
+            if (!strcmp(meoMsg->getType(), MIGRATE_MEAPP))
+                migrateMEApp(new Packet("CreateAppMessage", meoMsg));
+            /*  // todo gestire casi start / stop
+             * else if (!strcmp(meoMsg->getType(), STOP_MEAPP))
+                handleMigrateAppAck(msg);
+            */
+            else
+                EV << "MecPlatformManager::socketDataArrived - Unexpected type data: " << meoMsg->getType() << endl;
+        }
     }
 }
 
@@ -181,6 +190,8 @@ bool MecPlatformManager::terminateMEApp(DeleteAppMessage *msg)
 void MecPlatformManager::migrateMEAppsReq()
 {
     Enter_Method_Silent("MecPlatformManager::migrateMEAppsReq");
+
+    EV << "MEPM::migrateMEAppsReq" << endl;
 
     inet::Packet *newPkt = new inet::Packet("MigrateAppMessage");
     auto migrateMsgReq = inet::makeShared<MigrateAppMessage>();

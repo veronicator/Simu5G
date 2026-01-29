@@ -14,14 +14,17 @@
 
 #include <omnetpp.h>
 #include <inet/common/ModuleRefByPar.h>
+#include <inet/common/packet/ChunkQueue.h>
 
 #include "common/LteCommon.h"
 #include "nodes/mec/utils/MecCommon.h"
+#include "nodes/mec/MECOrchestrator/MECOMessages/MECOrchestratorMessages_m.h"
 #include "nodes/mec/VirtualisationInfrastructureManager/VirtualisationInfrastructureManager.h"
 #include "nodes/mec/MECPlatform/ServiceRegistry/ServiceRegistry.h"
 
 namespace simu5g {
 
+using namespace inet;
 using namespace omnetpp;
 
 //
@@ -46,6 +49,8 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     inet::L3Address meoAddress_;   // destination IP address to connect to the UALCMP
     int meoDestPort_;
     inet::TcpSocket meoSocket_;
+
+    std::map<int, inet::ChunkQueue> socketQueue;
 
     /* inet::TcpSocket::CallbackInterface callback methods */
     void socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bool urgent) override;
