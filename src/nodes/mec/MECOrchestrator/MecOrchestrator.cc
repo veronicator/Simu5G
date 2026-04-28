@@ -551,7 +551,7 @@ void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
     // Checking if contextId To tmpMeAppMapKey entry map does exist
     if (tmpMeAppMap.empty() || (tmpMeAppMap.find(contextId) == tmpMeAppMap.end())) {
         // Maybe it has already been migrated
-        EV << "MecOrchestrator::handleMigrateAppAck - \tWARNING MEC Application [" << tmpMeAppMap[contextId].mecUeAppID << "] not found!" << endl;
+        EV << "MecOrchestrator::handleMigrateAppAck - \tWARNING MEC Application [" << contextId << "] not found!" << endl;
 //        sendDeleteAppContextAck(false, contAppMsg->getRequestId(), contextId);
         return;
     }

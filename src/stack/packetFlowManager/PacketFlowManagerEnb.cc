@@ -693,7 +693,9 @@ void PacketFlowManagerEnb::ulMacPduArrived(MacNodeId nodeId, unsigned int grantI
             ++it;
         }
     }
-    throw cRuntimeError("%s::ulMacPduArrived - grant [%d] for nodeId [%hu] not present", pfmType.c_str(), grantId, num(nodeId));
+    // todo manage this case
+    return;
+//    throw cRuntimeError("%s::ulMacPduArrived - grant [%d] for nodeId [%hu] not present", pfmType.c_str(), grantId, num(nodeId));
 }
 
 double PacketFlowManagerEnb::getDelayStatsPerUe(MacNodeId id)
