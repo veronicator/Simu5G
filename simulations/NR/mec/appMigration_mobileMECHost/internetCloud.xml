@@ -1,6 +1,6 @@
 <internetCloud symmetric="true">
   <parameters name="good">
-    <traffic src="**" dest="**" delay="10ms+truncnormal(70ms,20ms)" datarate="uniform(1Gbps,10Gbps)" drop="false" />
+    <traffic src="**" dest="**" delay="10ms+truncnormal(70ms,10ms)" datarate="uniform(1Gbps,10Gbps)" drop="false" />
 <!--
     <traffic src="**" dest="**" delay="10ms+truncnormal(100ms,20ms)" datarate="uniform(100kbps,500kbps)" drop="uniform(0,1) &lt; uniform(0.01, 0.05)" />
 -->
