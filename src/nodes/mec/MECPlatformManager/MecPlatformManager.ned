@@ -32,7 +32,7 @@ simple MecPlatformManager
         int dscp = default(-1); // if not -1, set the DSCP (IPv4/IPv6) field of sent packets to this value
         int tos = default(-1); // if not -1, set the Type Of Service (IPv4) / Traffic Class (IPv6) field of sent packets to this value
 
-        string mecOrchestrator;
+        string mecOrchestrator = default("mecOrchestrator.mecOrchestratorApp");
         string serviceRegistryModule = default("^.mecPlatform.serviceRegistry");
         string vimModule = default("^.vim");
         @display("i=block/control");

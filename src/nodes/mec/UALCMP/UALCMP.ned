@@ -38,7 +38,7 @@ module UALCMP
         string gateway = default("upf");
 
         // hostname of the reference orchestrator
-        string mecOrchestratorHostname = default("mecOrchestrator");
+        string mecOrchestratorHostname = default("mecOrchestrator.mecOrchestratorApp");	// default("mecOrchestrator");
 
         bool hasIpv4 = default(true);
         bool hasIpv6 = default(false);
