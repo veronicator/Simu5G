@@ -33,8 +33,8 @@ module MecOrchestrator
 
         string selectionPolicy @enum(MecHostBased,MecServiceBased,AvailableResourcesBased, MigrationSelectionBased) = default("MecServiceBased"); // available policies: "MecHostBased", "MecServiceBased", "AvailableResourcesBased"
         int mecHostIndex = default(0); // to be used with the MecHostBased policybased
-//        object mecHostList = default([]);
-//        object mecApplicationPackageList = default([]);
+        object mecHostList = default([]);
+        object mecApplicationPackageList = default([]);
 
         // times to simulate lifecycle operations
         double onboardingTime @unit(s) = default(50ms);
@@ -88,8 +88,8 @@ module MecOrchestrator
 
    		    selectionPolicy = parent.selectionPolicy;
    		    mecHostIndex = parent.mecHostIndex;
-//   		    mecHostList = parent.mecHostList;
-//   		    mecApplicationPackageList = parent.mecApplicationPackageList;
+   		    mecHostList= parent.mecHostList.dup();
+   		    mecApplicationPackageList = parent.mecApplicationPackageList.dup();
    		
    		    onboardingTime = parent.onboardingTime;
    		    instantiationTime = parent.instantiationTime;
