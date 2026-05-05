@@ -25,6 +25,7 @@ simple VirtualisationInfrastructureManager
         string binderModule = default("binder");
         int mp1Port = default(10021);
         string scheduling @enum(segregation,fair) = default("segregation");
+        string upfModule = default("iUpf");
 
     gates:
         input virtualisationManagerIn;

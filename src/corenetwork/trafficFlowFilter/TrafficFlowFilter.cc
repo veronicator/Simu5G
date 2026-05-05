@@ -36,6 +36,10 @@ void TrafficFlowFilter::initialize(int stage)
     ownerType_ = selectOwnerType(par("ownerType"));
     if (ownerType_ == PGW || ownerType_ == UPF) {
         gateway_ = binder_->getNetworkName() + "." + std::string(getParentModule()->getFullName());
+        if (getParentModule()->hasPar("gateway")) {
+            if (!getParentModule()->par("gateway").isEmptyString())
+                gateway_ = binder_->getNetworkName() + "." + getParentModule()->par("gateway").stringValue();
+        }
     }
     else if (getParentModule()->hasPar("gateway")) {
         gateway_ = binder_->getNetworkName() + "." + getParentModule()->par("gateway").stringValue();
@@ -176,6 +180,10 @@ TrafficFlowTemplateId TrafficFlowFilter::findTrafficFlow(L3Address srcAddress, L
     if (destId == NODEID_NONE) {
         EV << "TrafficFlowFilter::findTrafficFlow - destination " << destAddress.str() << " is not a UE. ";
         if (ownerType_ == UPF || ownerType_ == PGW) {
+            if (inet::L3AddressResolver().findHostWithAddress(destAddress) != nullptr) {
+                EV << "Forward packet to the gateway." << endl;
+                return -1;
+            }
             EV << "Remove packet from the simulation." << endl;
             return -2;   // the destination UE has been removed from the simulation
         }

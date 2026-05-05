@@ -58,6 +58,12 @@ void GtpUser::initialize(int stage)
             gwAddress_ = L3AddressResolver().resolve(gateway.c_str());
         }
     }
+    else if (ownerType_ == UPF) {
+        if (!par("gateway").isEmptyString()) {
+            std::string gateway = binder_->getNetworkName() + "." + par("gateway").stdstringValue();
+            gwAddress_ = L3AddressResolver().resolve(gateway.c_str());
+        }
+    }
 
     if (isBaseStation(ownerType_))
         myMacNodeID = MacNodeId(networkNode_->par("macNodeId").intValue());

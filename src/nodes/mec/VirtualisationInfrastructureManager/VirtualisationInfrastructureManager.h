@@ -78,7 +78,6 @@ class VirtualisationInfrastructureManager : public cSimpleModule
     // other modules
     opp_component_ptr<cModule> mecHost;
     opp_component_ptr<cModule> mecPlatform;
-    opp_component_ptr<cModule> virtualisationInfr;
     //------------------------------------
     std::string interfaceTableModule;
     opp_component_ptr<inet::InterfaceTable> interfaceTable;

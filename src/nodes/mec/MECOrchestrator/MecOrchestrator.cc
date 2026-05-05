@@ -300,8 +300,9 @@ void MecOrchestrator::startMECApp(UALCMPMessage *msg)
                 isMobile = newMecApp.mecHost->par("isMobile").boolValue();
 
             if (!isMobile) {
-                // Register the address of the MEC app to the Binder, so the GTP knows the endpoint (UPF_MEC) where to forward packets to
-                inet::L3Address gtpAddress = inet::L3AddressResolver().resolve(newMecApp.mecHost->getSubmodule("upf_mec")->getFullPath().c_str());
+                // Register the address of the MEC app to the Binder, so the GTP knows the endpoint (iUpf) where to forward packets to
+                const char* upfModule = newMecApp.mecHost->getSubmodule("vim")->par("upfModule").stringValue();
+                inet::L3Address gtpAddress = inet::L3AddressResolver().resolve(getSimulation()->getModuleByPath(upfModule)->getFullPath().c_str());
                 binder_->registerMecHostUpfAddress(appInfo->endPoint.addr, gtpAddress);
             }
         }
