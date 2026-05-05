@@ -71,7 +71,7 @@ cModule *MigrationMecServiceSelectionBased::findBestMecHost(const ApplicationDes
 
 cModule *MigrationMecServiceSelectionBased::findNewBestMecHost(const ApplicationDescriptor& appDesc, const char* oldMecHost)
 {
-    EV << "MigrationecServiceSelectionBased::findBestMecHost - finding best MecHost..." << endl;
+    EV << "MigrationecServiceSelectionBased::findNewBestMecHost - finding best MecHost..." << endl;
     cModule *bestHost = nullptr;
     bool found = false;
 
@@ -81,7 +81,7 @@ cModule *MigrationMecServiceSelectionBased::findNewBestMecHost(const Application
         ResourceDescriptor resources = appDesc.getVirtualResources();
         bool res = vim->isAllocable(resources.ram, resources.disk, resources.cpu);
         if (!res) {
-            EV << "MigrationMecServiceSelectionBased::findBestMecHost - MEC host [" << mecHost->getName() << "] does not have enough resources. Searching again..." << endl;
+            EV << "MigrationMecServiceSelectionBased::findNewBestMecHost - MEC host [" << mecHost->getName() << "] does not have enough resources. Searching again..." << endl;
             continue;
         }
 
@@ -89,7 +89,7 @@ cModule *MigrationMecServiceSelectionBased::findNewBestMecHost(const Application
             continue;
 
         // Temporarily select this mec host as the best
-        EV << "MigrationMecServiceSelectionBased::findBestMecHost - MEC host [" << mecHost->getName() << "] temporarily chosen as the best MEC host, checking for the required MEC services.." << endl;
+        EV << "MigrationMecServiceSelectionBased::findNewBestMecHost - MEC host [" << mecHost->getName() << "] temporarily chosen as the best MEC host, checking for the required MEC services.." << endl;
         bestHost = mecHost;
 
         MecPlatformManager *mecpm = check_and_cast<MecPlatformManager *>(mecHost->getSubmodule("mecPlatformManager"));
@@ -99,16 +99,16 @@ cModule *MigrationMecServiceSelectionBased::findNewBestMecHost(const Application
         // I assume the app requires only one mec service
         if (appDesc.getAppServicesRequired().size() > 0) {
             serviceName = appDesc.getAppServicesRequired()[0];
-            EV << "MigrationMecServiceSelectionBased::findBestMecHost - required Mec Service: " << serviceName << endl;
+            EV << "MigrationMecServiceSelectionBased::findNewBestMecHost - required Mec Service: " << serviceName << endl;
         }
         else {
-            EV << "MigrationMecServiceSelectionBased::findBestMecHost - the Mec App does not require any MEC service. Choosing the temporary Mec Host as the best one" << endl;
+            EV << "MigrationMecServiceSelectionBased::findNewBestMecHost - the Mec App does not require any MEC service. Choosing the temporary Mec Host as the best one" << endl;
             found = true;
             break;
         }
         for (const auto& service : *mecServices) {
             if (serviceName == service.getName() && service.getMecHost() == bestHost->getName()) {
-                EV << "MigrationMecServiceSelectionBased::findBestMecHost - The temporary Mec Host has the MEC service " << service.getName() << " required by the Mec App. It has been chosen as the best one" << endl;
+                EV << "MigrationMecServiceSelectionBased::findNewBestMecHost - The temporary Mec Host has the MEC service " << service.getName() << " required by the Mec App. It has been chosen as the best one" << endl;
                 bestHost = mecHost;
                 found = true;
                 break;
@@ -119,9 +119,9 @@ cModule *MigrationMecServiceSelectionBased::findNewBestMecHost(const Application
     }
 
     if (bestHost != nullptr && !found)
-        EV << "MigrationMecServiceSelectionBased::findBestMecHost - The best Mec Host does not have the required service. Best MEC host: " << bestHost << endl;
+        EV << "MigrationMecServiceSelectionBased::findNewBestMecHost - The best Mec Host does not have the required service. Best MEC host: " << bestHost << endl;
     else if (bestHost == nullptr)
-        EV << "MigrationMecServiceSelectionBased::findBestMecHost - no MEC host found" << endl;
+        EV << "MigrationMecServiceSelectionBased::findNewBestMecHost - no MEC host found" << endl;
 
     return bestHost;
 }
