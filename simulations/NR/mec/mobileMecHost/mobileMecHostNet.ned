@@ -94,23 +94,21 @@ network mobileMecHostNet
         }
 
         router: Router {
-
-            @display("p=886,253");
+            @display("p=924,253");
         }
 
     connections allowunconnected:
 
         upf.pppg++ <--> Eth10G <--> iUpf.pppg++;
         iUpf.pppg++ <--> Eth10G <--> gNodeB1.ppp;
-//        ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
         mecHost_static.ppp++ <--> Eth10G <--> iUpf.filterGate if isStatic;
 
         router.pppg++ <--> Eth10G <--> upf.filterGate;
+        router.pppg++ <--> Eth10G <--> mecOrchestrator.ppp++;
 
         ualcmp.ppp++ <--> Eth10G <--> router.pppg++;
         ualcmp.toMecOrchestrator --> mecOrchestrator.fromUALCMP;
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
 
-        mecOrchestrator.ppp++ <--> Eth10G <--> router.pppg++;
 
 }

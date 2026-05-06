@@ -88,9 +88,6 @@ module MECHost
         output independentMecAppOut[numIndependentMecApp];			// connection to the ME App input gate
         input independentMecAppIn[numIndependentMecApp];			// connection to the ME App output gate
 
-        output meAppOut[];			// connection to the ME App input gate
-        input meAppIn[];			// connection to the ME App output gate
-
 
     submodules:
 
