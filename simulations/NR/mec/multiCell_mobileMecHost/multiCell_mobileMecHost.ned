@@ -8,6 +8,7 @@ import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
 import inet.networklayer.ipv4.RoutingTableRecorder;
 import inet.node.ethernet.Eth10G;
 import inet.node.internetcloud.InternetCloud;
+import inet.node.inet.Router;
 import ned.DatarateChannel;
 import simu5g.common.binder.Binder;
 import simu5g.common.carrierAggregation.CarrierAggregation;
@@ -107,6 +108,11 @@ network multiCell_mobileMecHost
             @display("p=685,149;is=vl");
         }
 
+        router: Router {
+
+            @display("p=705,124");
+        }
+
     connections:
 
         //# 5G Core Network connections
@@ -124,14 +130,18 @@ network multiCell_mobileMecHost
         iUpf3.pppg++ <--> Eth10G <--> gnb3.ppp;
 //        iUpf2.pppg++ <--> Eth10G {  length = parent.routersDelay*2e5; } <--> iUpf1.pppg++;	// channel delay
 
+		// Router connections
+        router.pppg++ <--> Eth10G <--> upf.filterGate;
+        router.pppg++ <--> Eth10G <--> mecOrchestrator.ppp++;
+        router.pppg++ <--> Eth10G <--> ualcmp.ppp++;
 
         //# MEC-related connections
-        ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
+//        ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
         ualcmp.toMecOrchestrator --> mecOrchestrator.fromUALCMP;
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
-        mecHost1.ppp++ <--> Eth10G <--> iUpf1.pppg++ if isStatic;
-//        mecHost2.ppp++ <--> Eth10G <--> iUpf2.pppg++;
-//        mecHost3.ppp++ <--> Eth10G <--> iUpf3.pppg++;
+        mecHost1.ppp++ <--> Eth10G <--> iUpf1.filterGate if isStatic;
+//        mecHost2.ppp++ <--> Eth10G <--> iUpf2.filterGate;
+//        mecHost3.ppp++ <--> Eth10G <--> iUpf3.filterGate;
 
         //# X2 connections
         gnb1.x2++ <--> Eth10G <--> gnb2.x2++;
