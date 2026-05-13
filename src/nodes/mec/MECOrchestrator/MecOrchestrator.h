@@ -141,6 +141,9 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     // it calls the method of the MEC platform manager of the MEC host where the MEC app has been deployed
     // to delete the MEC app
     void stopMECApp(UALCMPMessage *msg);
+
+    // handling STOP_MIGRATED_INSTANCE_APP type
+    // send a message to the MEPM of the source MecHost to stop the instance of the migrated MecApp
     void stopMigratedMecApp(bool result, int ueAppId, int contextId);
 
     void migrateMECApps(cMessage *msg);
@@ -149,7 +152,7 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     // sending ACK_CREATE_CONTEXT_APP or ACK_DELETE_CONTEXT_APP
     void sendCreateAppContextAck(bool result, unsigned int requestSno, int contextId = -1);
     void sendDeleteAppContextAck(bool result, unsigned int requestSno, int contextId = -1);
-    void sendMigrateAppContextAck(bool result, int ueAppId, int contextId = -1);
+    // send migrateAppContextMsg to UALCMP and schedule timer for trigger stop old MecApp instance
     void sendMigrateAppContext(bool result, int ueAppId, int contextId);
 
     /*

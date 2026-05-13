@@ -537,14 +537,8 @@ void MecOrchestrator::migrateMECApps(cMessage *msg) {
             }
             else {
                 // throw cRuntimeError("MecOrchestrator::startMECApp - A suitable MEC host has not been selected");
-                EV << "MecOrchestrator::migrateMECApps - A suitable MEC host has not been selected" << endl;
-//                MECOrchestratorMessage *msg = new MECOrchestratorMessage("MECOrchestratorMessage");
-//                msg->setType(MIGRATE_CONTEXT_APP);
-//                // requestId field used to send the ueAppID of interest to UALCMP
-//                msg->setRequestId(oldMecApp.mecUeAppID);
-//                msg->setSuccess(false);
-//                processingTime += instantiationTime / 2;
-//                scheduleAt(simTime() + processingTime, msg);
+                EV << "MecOrchestrator::migrateMECApps - A suitable MEC host has not been selected, the MECApp cannot be migrated" << endl;
+
             }
         }
     }
@@ -720,36 +714,6 @@ void MecOrchestrator::sendMigrateAppContext(bool result, int ueAppId, int contex
 
 }
 
-void MecOrchestrator::sendMigrateAppContextAck(bool result, int ueAppId, int contextId)
-{
-    EV << "MecOrchestrator::sendMigrateAppContextAck - result: " << result << " reqSno: " << ueAppId << " contextId: " << contextId << endl;
-    CreateContextAppAckMessage *ack = new CreateContextAppAckMessage();
-    ack->setType(ACK_MIGRATE_CONTEXT_APP);
-
-    if (result) {
-        if (tmpMeAppMap.empty() || tmpMeAppMap.find(contextId) == tmpMeAppMap.end()) {
-            EV << "MecOrchestrator::ackMEAppPacket - ERROR meApp[" << contextId << "] does not exist!" << endl;
-            return;
-        }
-
-        mecAppMapEntry mecAppStatus = tmpMeAppMap[contextId];
-
-        ack->setSuccess(true);
-        ack->setContextId(contextId);
-        ack->setAppInstanceId(mecAppStatus.mecAppInstanceId.c_str());
-        ack->setRequestId(ueAppId);
-        std::stringstream uri;
-
-        uri << mecAppStatus.mecAppAddress.str() << ":" << mecAppStatus.mecAppPort;
-
-        ack->setAppInstanceUri(uri.str().c_str());
-    }
-    else {
-        ack->setRequestId(ueAppId);
-        ack->setSuccess(false);
-    }
-    send(ack, "toUALCMP");
-}
 
 cModule *MecOrchestrator::findBestMecHost(const ApplicationDescriptor& appDesc)
 {

@@ -91,7 +91,8 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     void migrateMecAppsReq();
     void migrateMecApp(cMessage *msg);
 
-    /* stop and remove MecApp instance from source MecHost after migration */
+    /* stop and remove MecApp instance from the MecHost after migration
+     * triggered by a message from MEO*/
     void stopMigratedMecApp(cMessage *msg);
 
     const std::vector<ServiceInfo> *getAvailableMecServices() const;
