@@ -48,3 +48,20 @@ message DeleteContextAppAckMessage extends UALCMPMessage
     bool success;
 	int contextId;
 }
+
+message MigrateContextAppMessage extends UALCMPMessage
+{
+    int contextId;
+    string appInstanceId;
+    string appInstanceUri;
+}
+
+message MigrateContextAppAckMessage extends UALCMPMessage
+{
+    int contextId;
+    int sockUeId;
+    bool success;
+}
+
+ 
+    

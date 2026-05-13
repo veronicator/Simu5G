@@ -22,6 +22,7 @@
 #include "DeviceAppMessages/DeviceAppPacket_Types.h"
 #include "nodes/mec/MECPlatform/MECServices/packets/HttpRequestMessage/HttpRequestMessage.h"
 #include "nodes/mec/MECPlatform/MECServices/packets/HttpResponseMessage/HttpResponseMessage.h"
+#include "nodes/mec/UALCMP/UALCMPMessages/UALCMPNotifications_Types.h"
 #include "nodes/mec/utils/httpUtils/httpUtils.h"
 #include "nodes/mec/utils/httpUtils/json.hpp"
 
@@ -301,8 +302,70 @@ void DeviceApp::handleUALCMPMessage()
                 throw cRuntimeError("DeviceApp::handleUALCMPMessage() - appstate IDLE. No messages should arrive from the UALCMP");
         }
     }
+    else if (UALCMPMessage->getType() == REQUEST) {
+        EV << "DeviceApp::handleUALCMPMessage - REQUEST message" << endl;
+        HttpRequestMessage *request = dynamic_cast<HttpRequestMessage *>(UALCMPMessage);
+
+        switch (appState) {
+            case APPCREATED: {
+                // case when the instanceApp is already created but an app migration is necessary
+                // in this case the appState in the DeviceApp is APPCREATED and has not to be changed
+                std::string uri = request->getUri();
+                std::string body = request->getBody();
+                EV << "DeviceApp::handleUALCMPMessage - REQUEST - uri: " << uri << endl;
+
+                if (uri == "/example/dev_app/v1/notifications/AddressChangeNotification") {
+                    nlohmann::json jsonBody;
+                    try {
+                        jsonBody = nlohmann::json::parse(body); // get the JSON structure
+                    }
+                    catch (nlohmann::detail::parse_error e) {
+                        throw cRuntimeError("DeviceApp::handleUALCMPMessage - POSTRequest - %s", e.what());
+                        // body is not correctly formatted in JSON, manage it
+                        Http::send400Response(&ualcmpSocket_); // bad body JSON
+                        return;
+                    }
+                    inet::Packet *packet = new inet::Packet("DeviceAppStartAckPacket");
+                    std::string mecAppEndPoint = jsonBody["referenceURI"];
+
+                    EV_INFO << "DeviceApp::handleUALCMPMessage - POSTReq - reference URI of the application instance context is: " << appContextUri << endl;
+                    EV_INFO << "DeviceApp::handleUALCMPMessage - POSTReq - endPoint of the mec application instance is: " << mecAppEndPoint << endl;
+
+                    std::vector<std::string> endPoint = cStringTokenizer(mecAppEndPoint.c_str(), ":").asVector();
+
+                    std::string contextId = jsonBody["contextId"];
+
+                    EV_DEBUG << "DeviceApp::handleUALCMPMessage - POSTReq - sending ChangeAddress to the UE app" << endl;
+
+                    auto addrChange = inet::makeShared<DeviceAppStartAckPacket>();
+                    addrChange->setType(MIGRATE_MECAPP);
+                    addrChange->setContextId(contextId.c_str());
+                    addrChange->setResult(true);
+                    addrChange->setIpAddress(endPoint[0].c_str());
+                    addrChange->setPort(atoi(endPoint[1].c_str()));
+
+                    addrChange->setChunkLength(inet::B(2 + mecAppEndPoint.size() + contextId.size() + 1));
+                    addrChange->addTagIfAbsent<inet::CreationTimeTag>()->setCreationTime(simTime());
+
+                    packet->insertAtBack(addrChange);
+                    ueAppSocket_.sendTo(packet, ueAppAddress, ueAppPort);
+
+                    appState = APPCREATED;
+                    Http::send204Response(&ualcmpSocket_);
+                    return;
+                }
+
+                break;
+            }
+
+            case IDLE:
+            default:
+                throw cRuntimeError("DeviceApp::handleUALCMPMessage() - appstate IDLE. No messages should arrive from the UALCMP");
+
+        }
+        // TODO implement other subscriptions/notifications
+    }
     else {
-        // TODO implement subscriptions
         return;
     }
 }

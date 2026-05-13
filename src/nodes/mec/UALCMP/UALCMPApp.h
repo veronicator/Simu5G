@@ -57,6 +57,7 @@ class UALCMPApp : public MecServiceBase
 
   public:
     UALCMPApp();
+    void handleResponse(HttpResponseMessage *response, int sockId) override;
 
   protected:
 
@@ -82,6 +83,8 @@ class UALCMPApp : public MecServiceBase
     void handleCreateContextAppAckMessage(UALCMPMessage *msg);
     void handleDeleteContextAppAckMessage(UALCMPMessage *msg);
     void handleMigrateContextAppAckMessage(UALCMPMessage *msg);
+
+    void handleMigrateAppMessage(UALCMPMessage *msg);
 
     /*
      * Method used to parse the body of POST requests for the instantiation of MEC apps.

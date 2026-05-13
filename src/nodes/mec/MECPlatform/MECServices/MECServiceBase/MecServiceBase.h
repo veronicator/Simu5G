@@ -26,6 +26,7 @@
 #include "common/binder/Binder.h"
 #include "common/utils/utils.h"
 #include "nodes/mec/MECPlatform/MECServices/packets/HttpRequestMessage/HttpRequestMessage.h"
+#include "nodes/mec/MECPlatform/MECServices/packets/HttpResponseMessage/HttpResponseMessage.h"
 #include "nodes/mec/utils/MecCommon.h"
 #include "nodes/mec/utils/httpUtils/httpUtils.h"
 
@@ -245,6 +246,8 @@ class MecServiceBase : public inet::ApplicationBase, public inet::TcpSocket::ICa
      * @param socket used to send back the response
      */
     virtual void handleRequest(inet::TcpSocket *socket);
+
+    virtual void handleResponse(HttpResponseMessage *response, int sockId) {}
 
     /* This method is used by the SocketManager object in order to remove itself from the
      * map

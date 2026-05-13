@@ -29,6 +29,7 @@
 #include "nodes/mec/UALCMP/UALCMPMessages/CreateContextAppAckMessage.h"
 #include "nodes/mec/UALCMP/UALCMPMessages/UALCMPMessages_m.h"
 #include "nodes/mec/UALCMP/UALCMPMessages/UALCMPMessages_types.h"
+#include "nodes/mec/UALCMP/UALCMPMessages/UALCMPNotifications_Types.h"
 #include "nodes/mec/utils/httpUtils/httpUtils.h"
 
 namespace simu5g {
@@ -96,11 +97,13 @@ void UALCMPApp::handleMessageWhenUp(cMessage *msg)
 
             pendingRequests.erase(lcmMsg->getRequestId());
         }
+        else if (strcmp(lcmMsg->getType(), MIGRATE_CONTEXT_APP) == 0) {
+            handleMigrateAppMessage(lcmMsg);
+        }
         else if (strcmp(lcmMsg->getType(), ACK_MIGRATE_CONTEXT_APP) == 0) {
             handleMigrateContextAppAckMessage(lcmMsg);
         }
 
-//        pendingRequests.erase(lcmMsg->getRequestId());
         delete msg;
 
         return;
@@ -184,11 +187,40 @@ void UALCMPApp::handleDeleteContextAppAckMessage(UALCMPMessage *msg)
     }
 }
 
+void UALCMPApp::handleMigrateAppMessage(UALCMPMessage *msg) {
+    MigrateContextAppMessage *migrate = check_and_cast<MigrateContextAppMessage *>(msg);
+    int ueAppId = migrate->getRequestId();
+
+    EV << "UALCMPApp::handleMigrateContextAppMessage - ueAppId: " << ueAppId << endl;
+
+    nlohmann::json jsonBody;
+
+    if(ueSockets_.empty() || ueSockets_.find(ueAppId) == ueSockets_.end()) {
+        EV << "UALCMPApp::handleMigrateContextAppMessage - ERROR ueAppId: " << ueAppId << " does not exist in ueSockets map \n\t this should not happen" << endl;
+        return;
+    }
+    int sockId = ueSockets_[ueAppId];
+        inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(socketMap.getSocketById(sockId));
+
+        if (socket) {
+            jsonBody["notificationType"] = ADDRESS_CHANGE_NOTIFICATION;
+            jsonBody["contextId"] = std::to_string(migrate->getContextId());
+            jsonBody["appInstanceId"] = migrate->getAppInstanceId();
+            jsonBody["referenceURI"] = migrate->getAppInstanceUri(); // add the end point
+            std::stringstream uri;
+            uri << baseUriQueries_ << "/notifications/" << ADDRESS_CHANGE_NOTIFICATION;
+            std::pair<std::string, std::string> locHeader("Location: ", uri.str());
+
+            std::string host = socket->getRemoteAddress().str() + ":" + std::to_string(socket->getRemotePort());
+            Http::sendPostRequest(socket, jsonBody.dump().c_str(), host.c_str(), uri.str().c_str());
+        }
+}
+
+
 void UALCMPApp::handleMigrateContextAppAckMessage(UALCMPMessage *msg)
 {
     CreateContextAppAckMessage *ack = check_and_cast<CreateContextAppAckMessage *>(msg);
     int ueAppId = ack->getRequestId();
-
 
     EV << "UALCMPApp::handleMigrateContextAppAckMessage - ueAppId: " << ueAppId << endl;
 
@@ -345,7 +377,7 @@ void UALCMPApp::handlePUTRequest(const HttpRequestMessage *currentRequestMessage
 
 void UALCMPApp::handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket)
 {
-    EV << "LocationService::handleDELETERequest" << endl;
+    EV << "UALCMPApp::handleDELETERequest" << endl;
     // uri must be in form /example/dev_app/v1/app_context/contextId
     std::string uri = currentRequestMessageServed->getUri();
 
@@ -371,6 +403,16 @@ void UALCMPApp::handleDELETERequest(const HttpRequestMessage *currentRequestMess
         Http::send404Response(socket);
     }
 }
+
+
+void UALCMPApp::handleResponse(HttpResponseMessage *response, int sockId) {
+    EV << "UALCMPApp::handleResponse" << endl;
+    if (response->getCode() == 204) // Successful response of the post
+        EV << "UALCMPApp::handleResponse - code == 204 - sockId: " <<sockId << endl;
+    else
+        EV << "UALCMPApp::handleResponse - unknown response code" << endl;
+}
+
 
 CreateContextAppMessage *UALCMPApp::parseContextCreateRequest(const nlohmann::json& jsonBody)
 {

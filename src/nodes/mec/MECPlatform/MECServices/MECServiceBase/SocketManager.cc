@@ -73,6 +73,8 @@ void SocketManager::dataArrived(inet::Packet *msg, bool urgent) {
             msg->setArrivalTime(simTime());
             if (msg->getType() == REQUEST)
                 service->newRequest(check_and_cast<HttpRequestMessage *>(msg));
+            else if (msg->getType() == RESPONSE)
+                service->handleResponse(check_and_cast<HttpResponseMessage *>(msg), sock->getSocketId());
             else
                 delete msg;
         }
