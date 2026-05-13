@@ -14,6 +14,7 @@ package simu5g.simulations.NR.mec.singleMecHost;
 import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
 import inet.networklayer.ipv4.RoutingTableRecorder;
 import inet.node.ethernet.Eth10G;
+import inet.node.inet.Router;
 import simu5g.common.binder.Binder;
 import simu5g.common.carrierAggregation.CarrierAggregation;
 import simu5g.nodes.NR.NRUe;
@@ -71,11 +72,15 @@ network singleMecHost
         }
 
         mecOrchestrator: MecOrchestrator {
-            @display("p=544,63;is=l");
+            @display("p=589,61;is=l");
         }
 
         ualcmp: UALCMP {
-            @display("p=545,158;i=device/smallrouter");
+            @display("p=489,59;i=device/smallrouter");
+        }
+
+        router: Router {
+            @display("p=545,156");
         }
 
 
@@ -83,10 +88,14 @@ network singleMecHost
 
         upf.pppg++ <--> Eth10G <--> iUpf.pppg++;
         iUpf.pppg++ <--> Eth10G <--> gNodeB1.ppp;
-        ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
+//        ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
+        mecHost.ppp++ <--> Eth10G <--> iUpf.filterGate;
 
+        router.pppg++ <--> Eth10G <--> upf.filterGate;
+        router.pppg++ <--> Eth10G <--> mecOrchestrator.ppp++;
+
+        ualcmp.ppp++ <--> Eth10G <--> router.pppg++;
         ualcmp.toMecOrchestrator --> mecOrchestrator.fromUALCMP;
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
 
-        mecHost.ppp++ <--> Eth10G <--> iUpf.pppg++;
 }
