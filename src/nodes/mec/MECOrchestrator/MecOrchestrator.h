@@ -108,6 +108,7 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     double onboardingTime;
     double instantiationTime;
     double terminationTime;
+    double removalWaitingTime;
 
   public:
     const ApplicationDescriptor *getApplicationDescriptorByAppName(const std::string& appName) const;
@@ -140,6 +141,7 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     // it calls the method of the MEC platform manager of the MEC host where the MEC app has been deployed
     // to delete the MEC app
     void stopMECApp(UALCMPMessage *msg);
+    void stopMigratedMecApp(bool result, int ueAppId, int contextId);
 
     void migrateMECApps(cMessage *msg);
     void handleMigrateAppAck(cMessage *msg);
@@ -148,6 +150,7 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     void sendCreateAppContextAck(bool result, unsigned int requestSno, int contextId = -1);
     void sendDeleteAppContextAck(bool result, unsigned int requestSno, int contextId = -1);
     void sendMigrateAppContextAck(bool result, int ueAppId, int contextId = -1);
+    void sendMigrateAppContext(bool result, int ueAppId, int contextId);
 
     /*
      * This method selects the most suitable MEC host where to deploy the MEC app.

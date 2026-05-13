@@ -45,7 +45,7 @@ void MobileMECHost::receiveSignal(cComponent *source, simsignal_t signalID, intv
     MecPlatformManager *mepm = check_and_cast<MecPlatformManager *>(this->getSubmodule("mecPlatformManager"));
     if (isMobilityAware && signalID == NRPhyUe::handoverServingCellSignal_) {
         binder_->setStartMECHostHandover(simTime());
-        mepm->migrateMEAppsReq();
+        mepm->migrateMecAppsReq();
     }
 }
 

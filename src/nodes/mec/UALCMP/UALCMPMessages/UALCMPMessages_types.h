@@ -24,5 +24,8 @@
 #define MIGRATE_CONTEXT_APP        "MigrateContextApp"
 #define ACK_MIGRATE_CONTEXT_APP    "MigrateContextAppAck"
 
+#define STOP_MIGRATED_INSTANCE_APP        "StopMigratedInstanceApp"
+#define ACK_STOP_MIGRATED_INSTANCE_APP    "StopMigratedInstanceAppAck"
+
 #endif /* NODES_MEC_LCMPROXY_LCMPROXYMESSAGES_LCMPROXYMESSAGES_TYPES_H_ */
 

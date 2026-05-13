@@ -41,6 +41,7 @@ simple MecOrchestratorApp
         double onboardingTime @unit(s) = default(50ms);
         double instantiationTime @unit(s) = default(50ms);
         double terminationTime @unit(s) = default(50ms);
+        double removalWaitingTime @unit(s) = default(20s);
 
     gates:
         output socketOut;

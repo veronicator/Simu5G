@@ -62,6 +62,7 @@ void MecOrchestrator::initialize(int stage)
         onboardingTime = par("onboardingTime").doubleValue();
         instantiationTime = par("instantiationTime").doubleValue();
         terminationTime = par("terminationTime").doubleValue();
+        removalWaitingTime = par("removalWaitingTime").doubleValue();
 
         getConnectedMecHosts();
         onboardApplicationPackages();
@@ -102,7 +103,10 @@ void MecOrchestrator::handleMessage(cMessage *msg)
                 sendDeleteAppContextAck(meoMsg->getSuccess(), meoMsg->getRequestId(), meoMsg->getContextId());
 
             else if (strcmp(meoMsg->getType(), MIGRATE_CONTEXT_APP) == 0)
-                sendMigrateAppContextAck(meoMsg->getSuccess(), meoMsg->getRequestId(), meoMsg->getContextId());
+                sendMigrateAppContext(meoMsg->getSuccess(), meoMsg->getRequestId(), meoMsg->getContextId());
+            else if (strcmp(meoMsg->getType(), STOP_MIGRATED_INSTANCE_APP) == 0) {
+                stopMigratedMecApp(meoMsg->getSuccess(), meoMsg->getRequestId(), meoMsg->getContextId());
+            }
         }
     }
     // Handle message from the LCM proxy
@@ -402,6 +406,53 @@ void MecOrchestrator::stopMECApp(UALCMPMessage *msg) {
     scheduleAt(simTime() + processingTime, mecoMsg);
 }
 
+
+void MecOrchestrator::stopMigratedMecApp(bool result, int ueAppId, int contextId) {
+
+    EV << "MecOrchestrator::stopMigratedMecApp - processing contextId: " << contextId << endl;
+
+    if (!result) {
+        EV << "MecOrchestrator::stopMigratedMecApp - not success - this should not happen" << endl;
+        return;
+    }
+
+    // Checking if ueAppIdToMeAppMapKey entry map does exist
+    if (meAppMap.empty() || (meAppMap.find(contextId) == meAppMap.end())) {
+        // Maybe it has already been deleted
+        EV << "MecOrchestrator::stopMigratedMecApp - \tWARNING MEC Application [" << contextId << "] not found!" << endl;
+        return;
+    }
+
+    // Send a message to MEPM of the selected MEC host to deallocate the resources (source-mepm)
+
+    auto deleteAppMsg = inet::makeShared<DeleteAppMessage>();
+    deleteAppMsg->setType(STOP_MIGRATED_MEAPP);
+    deleteAppMsg->setUeAppID(ueAppId);
+
+    inet::B msgSize = inet::B(80 + strlen(deleteAppMsg->getType()) + strlen(deleteAppMsg->getSourceAddress())
+            + strlen(deleteAppMsg->getDestinationAddress()) + strlen(deleteAppMsg->getDestinationMecAppAddress()) + strlen(deleteAppMsg->getMEModuleType())
+            + strlen(deleteAppMsg->getMEModuleName()) + strlen(deleteAppMsg->getRequiredService()));
+    deleteAppMsg->setChunkLength(msgSize);
+
+    // create pkt to send through socket to the mepm on the new mec host
+    inet::Packet *newPkt = new inet::Packet("DeleteAppMessage");
+    newPkt->insertAtBack(deleteAppMsg);
+
+    MecPlatformManager *mecpm = check_and_cast<MecPlatformManager *>(meAppMap[contextId].mecpm);
+    inet::L3Address mepmAddress = mecpm->getMepmAddress();
+    int sockId = mepmSockets_[mepmAddress];
+    inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(sockets_.getSocketById(sockId));
+
+    socket->send(newPkt);
+
+    meAppMap[contextId] = tmpMeAppMap[contextId];
+
+    tmpMeAppMap.erase(tmpMeAppMap.find(contextId));
+
+}
+
+
+
 void MecOrchestrator::migrateMECApps(cMessage *msg) {
     Enter_Method_Silent("MecOrchestrator::migrateMECApps");
 
@@ -561,7 +612,7 @@ void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
 
     auto it = mecApplicationDescriptors_.find(tmpMecApp.appDId);
     if (it == mecApplicationDescriptors_.end()) {
-        // this should not happen bc the appDid is in the mecAppMap, so the mecApp is already instantiated at least once
+        // this should not happen bc the appDId is in the mecAppMap, so the mecApp is already instantiated at least once
         EV << "MecOrchestrator::handleMigrateAppAck - Application package with AppDId[" << tmpMecApp.appDId << "] not onboarded." << endl;
 
         return;
@@ -615,7 +666,7 @@ void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
      tmpMecApp.mecAppInstanceId = appInfo->instanceId;
      tmpMecApp.contextId = contextId;
      tmpMecApp.reference = appInfo->reference;
-     meAppMap[contextId] = tmpMecApp;
+     tmpMeAppMap[contextId] = tmpMecApp;
 
      MECOrchestratorMessage *meoMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
      meoMsg->setContextId(contextId);
@@ -631,6 +682,44 @@ void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
 
 }
 
+void MecOrchestrator::sendMigrateAppContext(bool result, int ueAppId, int contextId) {
+    EV << "MecOrchestrator::sendMigrateAppContext - result: " << result << " reqSno: " << ueAppId << " contextId: " << contextId << endl;
+    if (!result) {
+        EV << "MecOrchestrator::sendMigrateAppContext - App NOT migrated" << endl;
+        return;
+    }
+
+    MigrateContextAppMessage *migrateMsg = new MigrateContextAppMessage();
+    migrateMsg->setType(MIGRATE_CONTEXT_APP);
+    if (tmpMeAppMap.empty() || tmpMeAppMap.find(contextId) == tmpMeAppMap.end()) {
+        EV << "MecOrchestrator::ackMEAppPacket - ERROR meApp[" << contextId << "] does not exist!" << endl;
+        return;
+    }
+
+    mecAppMapEntry mecAppStatus = tmpMeAppMap[contextId];
+
+    migrateMsg->setContextId(contextId);
+    migrateMsg->setAppInstanceId(mecAppStatus.mecAppInstanceId.c_str());
+    migrateMsg->setRequestId(ueAppId);
+    std::stringstream uri;
+
+    uri << mecAppStatus.mecAppAddress.str() << ":" << mecAppStatus.mecAppPort;
+
+    migrateMsg->setAppInstanceUri(uri.str().c_str());
+
+    send(migrateMsg, "toUALCMP");
+
+    MECOrchestratorMessage *deleteAppMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
+    deleteAppMsg->setType(STOP_MIGRATED_INSTANCE_APP);
+    deleteAppMsg->setContextId(contextId);
+    deleteAppMsg->setRequestId(meAppMap[contextId].mecUeAppID);
+    deleteAppMsg->setSuccess(true);
+
+    double processingTime = removalWaitingTime + terminationTime;
+    scheduleAt(simTime() + processingTime, deleteAppMsg);
+
+}
+
 void MecOrchestrator::sendMigrateAppContextAck(bool result, int ueAppId, int contextId)
 {
     EV << "MecOrchestrator::sendMigrateAppContextAck - result: " << result << " reqSno: " << ueAppId << " contextId: " << contextId << endl;
@@ -638,12 +727,12 @@ void MecOrchestrator::sendMigrateAppContextAck(bool result, int ueAppId, int con
     ack->setType(ACK_MIGRATE_CONTEXT_APP);
 
     if (result) {
-        if (meAppMap.empty() || meAppMap.find(contextId) == meAppMap.end()) {
+        if (tmpMeAppMap.empty() || tmpMeAppMap.find(contextId) == tmpMeAppMap.end()) {
             EV << "MecOrchestrator::ackMEAppPacket - ERROR meApp[" << contextId << "] does not exist!" << endl;
             return;
         }
 
-        mecAppMapEntry mecAppStatus = meAppMap[contextId];
+        mecAppMapEntry mecAppStatus = tmpMeAppMap[contextId];
 
         ack->setSuccess(true);
         ack->setContextId(contextId);
