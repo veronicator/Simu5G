@@ -36,7 +36,7 @@ module Upf extends NetworkLayerNodeBase
         @figure[submodules];
 
         string nodeType = default("UPF");   // do NOT change!
-        string gateway = default("");
+        string gateway = default("");		// configure an explicit gateway for iUpf when using a wired MecHost (not necessary with mobile one)
         forwarding = default(true);
         multicastForwarding = default(false);
 

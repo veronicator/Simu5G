@@ -143,8 +143,8 @@ void UERequestCbrApp::handleMessage(cMessage *msg)
                 handleAckStartMECRequestCbrApp(msg);
             else if (!strcmp(mePkt->getType(), ACK_STOP_MECAPP))
                 handleAckStopMECRequestCbrApp(msg);
-            else if (!strcmp(mePkt->getType(), ACK_MIGRATE_MECAPP))
-                handleAckMigrateMECRequestCbrApp(msg);
+            else if (!strcmp(mePkt->getType(), MIGRATE_MECAPP))
+                handleMigrateMECRequestCbrApp(msg);
             else
                 throw cRuntimeError("UERequestCbrApp::handleMessage - \tFATAL! Error, DeviceAppPacket type %s not recognized", mePkt->getType());
         }
@@ -261,9 +261,9 @@ void UERequestCbrApp::handleAckStopMECRequestCbrApp(cMessage *msg)
     cancelEvent(selfStop_);
 }
 
-void UERequestCbrApp::handleAckMigrateMECRequestCbrApp(cMessage *msg)
+void UERequestCbrApp::handleMigrateMECRequestCbrApp(cMessage *msg)
 {
-    EV << "UERequestCbrApp::handleAckMigrateMECRequestCbrApp - Received Migrate ACK packet" << endl;
+    EV << "UERequestCbrApp::handleMigrateMECRequestCbrApp - Received Migrate packet" << endl;
     inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
     auto pkt = packet->peekAtFront<DeviceAppStartAckPacket>();
 
@@ -274,13 +274,13 @@ void UERequestCbrApp::handleAckMigrateMECRequestCbrApp(cMessage *msg)
 
         mecAppAddress_ = L3AddressResolver().resolve(pkt->getIpAddress());
         mecAppPort_ = pkt->getPort();
-        EV << "UERequestCbrApp::handleAckMigrateMECRequestCbrApp - Received " << pkt->getType() << " type RequestPacket. mecApp instance is at: " << mecAppAddress_ << ":" << mecAppPort_ << endl;
+        EV << "UERequestCbrApp::handleMigrateMECRequestCbrApp - Received " << pkt->getType() << " type RequestPacket. mecApp instance is at: " << mecAppAddress_ << ":" << mecAppPort_ << endl;
         cancelEvent(selfStart_);
         //scheduling sendStopMECRequestCbrApp()
         if (!selfStop_->isScheduled()) {
             simtime_t stopTime = par("stopTime");
             scheduleAt(simTime() + stopTime, selfStop_);
-            EV << "UERequestCbrApp::handleAckMigrteMECRequestCbrApp - Starting sendStopMECRequestCbrApp() in " << stopTime << " seconds " << endl;
+            EV << "UERequestCbrApp::handleMigrteMECRequestCbrApp - Starting sendStopMECRequestCbrApp() in " << stopTime << " seconds " << endl;
         }
     }
 //    else {    // todo results == false in case of migration

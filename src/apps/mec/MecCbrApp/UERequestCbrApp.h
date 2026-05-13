@@ -100,7 +100,7 @@ class UERequestCbrApp : public cSimpleModule
 
     void handleAckStartMECRequestCbrApp(cMessage *msg);
     void handleAckStopMECRequestCbrApp(cMessage *msg);
-    void handleAckMigrateMECRequestCbrApp(cMessage *msg);
+    void handleMigrateMECRequestCbrApp(cMessage *msg);
 
     // --- Functions to interact with the MECPlatooningApp --- //
     void sendRequest();

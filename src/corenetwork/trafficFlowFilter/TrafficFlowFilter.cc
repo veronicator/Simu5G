@@ -73,14 +73,14 @@ void TrafficFlowFilter::initialize(int stage)
     if (getParentModule()->hasPar("mecHost")) {
 
         meHost = getParentModule()->par("mecHost").stringValue();
-        if (isBaseStation(ownerType_) && !meHost.empty()) {
-                    std::stringstream meHostName;
-                    meHostName << meHost << ".virtualisationInfrastructure";
-                    meHost = meHostName.str();
-            meHostAddress = inet::L3AddressResolver().resolve(meHost.c_str());
-
-            EV << "TrafficFlowFilter::initialize - meHost: " << meHost << " meHostAddress: " << meHostAddress.str() << endl;
-        }
+//        if (isBaseStation(ownerType_) && !meHost.empty()) {
+//                    std::stringstream meHostName;
+//                    meHostName << meHost << ".virtualisationInfrastructure";
+//                    meHost = meHostName.str();
+//            meHostAddress = inet::L3AddressResolver().resolve(meHost.c_str());
+//
+//            EV << "TrafficFlowFilter::initialize - meHost: " << meHost << " meHostAddress: " << meHostAddress.str() << endl;
+//        }
     }
     //end mec
 

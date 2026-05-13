@@ -111,13 +111,6 @@ module MobileHostNode
         input radioIn @directIn;     // connection to master
         input nrRadioIn @directIn;
 
-		 //from MecHost
-//        //to local radio networks
-//        inout ppp[];
-//
-//        //to external networks (internet)
-//        inout pppIf[];
-
     submodules:
         interfaceTable: InterfaceTable {
             @display("p=127,257;is=s");
@@ -125,13 +118,6 @@ module MobileHostNode
         mobility: <default("StationaryMobility")> like IMobility {
             @display("p=127,172;is=s");
         }
-
-		//*
-//        virtualisationInfrastructure: VirtualisationInfrastructure {
-//            parameters:
-//                @display("p=980,213");
-//                gateway = parent.gateway;
-//        }
 
         mecPlatform: MECPlatform {
             @display("p=981,63");
@@ -153,7 +139,6 @@ module MobileHostNode
         independentMecApp[numIndependentMecApp]: <> like IApp {
             @display("p=696,41,row,140");
         }
-        //*//
 
 
         //# layer submodules (must be ordered from lower to upper layers)

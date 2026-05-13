@@ -16,7 +16,7 @@ namespace simu5g;
 
 message MECOrchestratorMessage {
     int contextId; // identifier of the ueMecApp 
-    int requestId; // used to inform the UALCMP to which request the response refers
+    int requestId; // used to inform the UALCMP to which request the response refers or to which UeId in case of migration
     string type; // trigger of mecApp setup or termination 	 
     bool success;   
 }
@@ -109,15 +109,6 @@ class MigrateAppMessage extends MECAppMessage {
     
 //    //type of message
 //    string type;
-    
-//    //communication informations
-//    string sourceAddress;
-//    int	   sourcePort;   // added by Alessandro Noferi
-//    string destinationAddress;
-//    int	   destinationPort;   // added by Alessandro Noferi
-//    string destinationMecAppAddress;
-//    int	   destinationMecAppPort;   // added by Alessandro Noferi
-    
     
 //    //instantiation informations
 //    string MEModuleType;			//path where to find the cModule of the MEApp to instantiate
