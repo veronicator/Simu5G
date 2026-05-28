@@ -57,11 +57,6 @@ void MECResponseApp::initialize(int stage)
     minInstructions_ = par("minInstructions");
     maxInstructions_ = par("maxInstructions");
 
-    // connect with the service registry
-    EV << "MECResponseApp::initialize - Initialize connection with the Service Registry via Mp1" << endl;
-    mp1Socket_ = addNewSocket();
-
-    connect(mp1Socket_, mp1Address, mp1Port);
 }
 
 void MECResponseApp::handleProcessedMessage(cMessage *msg)
@@ -120,7 +115,7 @@ void MECResponseApp::handleRequest(cMessage *msg)
 void MECResponseApp::handleStopRequest(cMessage *msg)
 {
     EV << "MECResponseApp::handleStopRequest" << endl;
-    serviceSocket_->close();
+    mecServices[RNIS]->serviceSocket_->close();
 }
 
 void MECResponseApp::sendResponse()
@@ -153,55 +148,17 @@ void MECResponseApp::sendResponse()
 void MECResponseApp::handleHttpMessage(int connId)
 {
     if (mp1Socket_ != nullptr && connId == mp1Socket_->getSocketId()) {
-        handleMp1Message(connId);
+        return;
     }
     else {
         handleServiceMessage(connId);
     }
 }
 
-void MECResponseApp::handleMp1Message(int connId)
-{
-    // for now I only have just one Service Registry
-    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(mp1Socket_->getUserData());
-    mp1HttpMessage = check_and_cast_nullable<HttpBaseMessage *>(msgStatus->httpMessageQueue.front());
-    EV << "MECPlatooningApp::handleMp1Message - payload: " << mp1HttpMessage->getBody() << endl;
-
-    try {
-        nlohmann::json jsonBody = nlohmann::json::parse(mp1HttpMessage->getBody()); // get the JSON structure
-        if (!jsonBody.empty()) {
-            jsonBody = jsonBody[0];
-            std::string serName = jsonBody["serName"];
-            if (serName == "RNIService") {
-                if (jsonBody.contains("transportInfo")) {
-                    nlohmann::json endPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
-                    EV << "address: " << endPoint["host"] << " port: " << endPoint["port"] << endl;
-                    std::string address = endPoint["host"];
-                    serviceAddress_ = L3AddressResolver().resolve(address.c_str());
-                    servicePort_ = endPoint["port"];
-                    serviceSocket_ = addNewSocket();
-                    connect(serviceSocket_, serviceAddress_, servicePort_);
-                }
-            }
-            else {
-                EV << "MECPlatooningApp::handleMp1Message - RNIService not found" << endl;
-                serviceAddress_ = L3Address();
-            }
-        }
-
-        //close service registry socket
-        mp1Socket_->close();
-    }
-    catch (nlohmann::detail::parse_error e) {
-        EV << e.what() << std::endl;
-        // body is not correctly formatted in JSON, manage it
-        return;
-    }
-}
 
 void MECResponseApp::handleServiceMessage(int connId)
 {
-    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(serviceSocket_->getUserData());
+    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(mecServices[RNIS]->serviceSocket_->getUserData());
     HttpBaseMessage *httpMessage = check_and_cast<HttpBaseMessage *>(msgStatus->httpMessageQueue.front());
 
     if (httpMessage->getType() == RESPONSE) {
@@ -229,13 +186,13 @@ void MECResponseApp::doComputation()
 void MECResponseApp::sendGetRequest()
 {
     //check if the ueAppAddress is specified
-    if (serviceSocket_->getState() == inet::TcpSocket::CONNECTED) {
+    if (mecServices[RNIS]->serviceSocket_->getState() == inet::TcpSocket::CONNECTED) {
         EV << "MECResponseApp::sendGetRequest(): send request to the Location Service" << endl;
         std::stringstream uri;
         uri << "/example/rni/v2/queries/layer2_meas"; //TODO filter the request to get less data
         EV << "MECResponseApp::requestLocation(): uri: " << uri.str() << endl;
-        std::string host = serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(serviceSocket_->getRemotePort());
-        Http::sendGetRequest(serviceSocket_, host.c_str(), uri.str().c_str());
+        std::string host = mecServices[RNIS]->serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(mecServices[RNIS]->serviceSocket_->getRemotePort());
+        Http::sendGetRequest(mecServices[RNIS]->serviceSocket_, host.c_str(), uri.str().c_str());
     }
     else {
         EV << "MECResponseApp::sendGetRequest(): Location Service not connected" << endl;
@@ -251,10 +208,9 @@ void MECResponseApp::established(int connId)
 
         // once the connection with the Service Registry has been established, obtain the
         // endPoint (address+port) of the Location Service
-        const char *uri = "/example/mec_service_mgmt/v1/services?ser_name=RNIService";
-        std::string host = mp1Socket_->getRemoteAddress().str() + ":" + std::to_string(mp1Socket_->getRemotePort());
+        requiredSerName_ = "LocationService";
+        MecAppBase::established(connId);
 
-        Http::sendGetRequest(mp1Socket_, host.c_str(), uri);
     }
 }
 

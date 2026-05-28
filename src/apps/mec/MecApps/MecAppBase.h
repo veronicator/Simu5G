@@ -23,6 +23,7 @@
 #include "nodes/mec/MECPlatform/MECServices/packets/HttpRequestMessage/HttpRequestMessage.h"
 #include "nodes/mec/MECPlatform/MECServices/packets/HttpResponseMessage/HttpResponseMessage.h"
 #include "nodes/mec/MECPlatform/MECServices/packets/HttpMessages_m.h"
+#include "nodes/mec/MECPlatform/MecServiceEnum_m.h"
 #include "nodes/mec/MECPlatform/ServiceRegistry/ServiceRegistry.h"
 #include "nodes/mec/VirtualisationInfrastructureManager/VirtualisationInfrastructureManager.h"
 
@@ -54,6 +55,12 @@ struct HttpMessageStatus
     ProcessingTimeMessage *processMsgTimer = nullptr;
 };
 
+struct MecServiceSocketInfo {
+    inet::TcpSocket *serviceSocket_ = nullptr;
+    inet::L3Address serviceAddress_;
+    int servicePort_;
+};
+
 class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
 {
   protected:
@@ -64,17 +71,20 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
      * NOTE: remember to delete the HttpBaseMessage* pointer!
      */
     inet::SocketMap sockets_;
+    MecServiceSocketInfo* mecServices[4] = {nullptr, nullptr, nullptr, nullptr};
+    std::string requiredSerName_;
+
+    bool isMobilityAware;
 
     cQueue packetQueue_;
     cMessage *currentProcessedMsg_ = nullptr;
     cMessage *processMessage_ = nullptr;
 
+    HttpBaseMessage *mp1HttpMessage = nullptr;
     // endpoint for contacting the Service Registry
+    inet::TcpSocket *mp1Socket_ = nullptr;
     inet::L3Address mp1Address;
     int mp1Port;
-
-    inet::L3Address serviceAddress;
-    int servicePort;
 
     // FIXME not used, yet. These structures are supposed to be used
     cQueue serviceHttpMessages_;
@@ -103,10 +113,13 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     virtual void handleProcessedMessage(cMessage *msg);
     virtual void handleSelfMessage(cMessage *msg) = 0;
     virtual void handleServiceMessage(int connId) = 0;
-    virtual void handleMp1Message(int connId) = 0;
+    virtual void handleMp1Message(int connId);
     virtual void handleHttpMessage(int connId) = 0;
     virtual void handleUeMessage(cMessage *msg) = 0;
-    virtual void established(int connId) = 0;
+    virtual void established(int connId);
+
+    // method to handle REQ/RES messages from Application Mobility Service
+    void handleAmsMessage(int connId);
 
     virtual double scheduleNextMsg(cMessage *msg);
 

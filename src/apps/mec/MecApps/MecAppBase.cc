@@ -55,6 +55,20 @@ void MecAppBase::initialize(int stage)
 
     serviceRegistry.reference(this, "serviceRegistryModule", true);
 
+    mp1Socket_ = addNewSocket();
+
+
+    isMobilityAware = par("isMobilityAware").boolValue();
+
+    if (isMobilityAware) {
+        mecServices[AMS] = new MecServiceSocketInfo;
+        mecServices[AMS]->serviceSocket_ = addNewSocket();
+    }
+
+    // connect with the service registry
+    cMessage *msg = new cMessage("connectMp1");
+    scheduleAt(simTime() + 0, msg);
+
     processMessage_ = new cMessage("processedMessage");
 }
 
@@ -86,7 +100,12 @@ void MecAppBase::connect(inet::TcpSocket *socket, const inet::L3Address& address
 void MecAppBase::handleMessage(cMessage *msg)
 {
     if (msg->isSelfMessage()) {
-        if (strcmp(msg->getName(), "processedMessage") == 0) {
+        if (strcmp(msg->getName(), "connectMp1") == 0) {
+            EV << "MecAppBase::handleMessage " << msg->getName() << endl;
+            connect(mp1Socket_, mp1Address, mp1Port);
+        }
+        else if (strcmp(msg->getName(), "processedMessage") == 0) {
+            EV << "MecAppBase::handleMessage() - processedMessage " << endl;
             handleProcessedMessage(check_and_cast<cMessage *>(packetQueue_.pop()));
             if (!packetQueue_.isEmpty()) {
                 double processingTime = scheduleNextMsg(check_and_cast<cMessage *>(packetQueue_.front()));
@@ -104,7 +123,14 @@ void MecAppBase::handleMessage(cMessage *msg)
             TcpSocket *sock = static_cast<TcpSocket *>(sockets_.getSocketById(connId));
             if (sock != nullptr) {
                 HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(sock->getUserData());
-                handleHttpMessage(connId);
+
+                if (mp1Socket_ != nullptr && connId == mp1Socket_->getSocketId())
+                    MecAppBase::handleMp1Message(connId);
+                else if (mecServices[AMS] != nullptr && connId == mecServices[AMS]->serviceSocket_->getSocketId())
+                    MecAppBase::handleAmsMessage(connId);
+                else
+                    handleHttpMessage(connId);
+
                 delete msgStatus->httpMessageQueue.pop();
                 if (!msgStatus->httpMessageQueue.isEmpty()) {
                     EV << "MecAppBase::handleMessage(): processedHttpMsg - the httpMessageQueue is not empty, schedule next HTTP message" << endl;
@@ -112,6 +138,31 @@ void MecAppBase::handleMessage(cMessage *msg)
                     scheduleAt(simTime() + time, msg);
                 }
             }
+        }
+        else if (strcmp(msg->getName(), "amsConnectMessage") == 0) {
+            EV << "MecAppBase::handleMessage(): amsConnectMessage " << endl;
+            // todo check correctness
+            if (strcmp(msg->getName(), "amsConnectMessage") == 0) {
+                if (mecServices[AMS]->serviceAddress_.isUnspecified()) {
+                    EV << "MECAppBase::handleSelfMessage - ams IP address is unspecified (maybe response from the service registry is arriving)" << endl;
+                }
+                else
+                    switch (mecServices[AMS]->serviceSocket_->getState()) {
+                        case inet::TcpSocket::PEER_CLOSED:
+                        case inet::TcpSocket::LOCALLY_CLOSED:
+                        case inet::TcpSocket::CLOSED:
+                        case inet::TcpSocket::SOCKERROR:
+                            mecServices[AMS]->serviceSocket_->renewSocket();
+                            // nobreak;
+                        case inet::TcpSocket::NOT_BOUND:
+                        case inet::TcpSocket::BOUND:
+                            connect(mecServices[AMS]->serviceSocket_, mecServices[AMS]->serviceAddress_, mecServices[AMS]->servicePort_);
+                            break;
+                        default:
+                            EV << "MecAppBase::handleMessage - AMS socket state: " << (int)mecServices[AMS]->serviceSocket_->getState() << endl;
+                    }
+            }
+
         }
         else {
             handleSelfMessage(msg);
@@ -134,6 +185,126 @@ void MecAppBase::handleMessage(cMessage *msg)
         else {
             throw cRuntimeError("MecAppBase::handleMessage - This situation is not possible");
         }
+    }
+}
+
+void MecAppBase::handleMp1Message(int connId) {
+    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(mp1Socket_->getUserData());
+    mp1HttpMessage = check_and_cast_nullable<HttpBaseMessage *>(msgStatus->httpMessageQueue.front());
+    EV << "MecAppBase::handleMp1Message - payload: " << mp1HttpMessage->getBody() << endl;
+
+    try {
+        nlohmann::json jsonBodyTot = nlohmann::json::parse(mp1HttpMessage->getBody()); // get the JSON structure
+        if (!jsonBodyTot.empty()) {
+            nlohmann::json LSEndPoint = nullptr;
+            nlohmann::json RNISEndPoint = nullptr;
+            nlohmann::json AMSEndPoint = nullptr;
+            bool localLS = false, localRNIS = false, localAMS = false;
+            for (auto jsonBody: jsonBodyTot) {
+                std::string serName = jsonBody["serName"];
+                if(serName == "ApplicationMobilityService") {
+                    std::string isLocal = jsonBody["isLocal"];
+                    if (isLocal == "TRUE") {
+                        localAMS = true;
+                        if (jsonBody.contains("transportInfo")) {
+                            AMSEndPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
+                        }
+                    } else if (!localAMS) {
+                        AMSEndPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
+                    }
+                }
+                else if (serName == "LocationService") {
+                    std::string isLocal = jsonBody["isLocal"];
+                    if (isLocal == "TRUE") {
+                        localLS = true;
+                        if (jsonBody.contains("transportInfo")) {
+                            LSEndPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
+                        }
+                    } else if (!localLS) {
+                        LSEndPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
+                    }
+                }
+                else if (serName == "RNIService") {
+                    std::string isLocal = jsonBody["isLocal"];
+                    if (isLocal == "TRUE") {
+                        localRNIS = true;
+                        if (jsonBody.contains("transportInfo")) {
+                            RNISEndPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
+                        }
+                    } else if (!localRNIS) {
+                        RNISEndPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
+                    }
+                }
+            }   // end for
+
+            if (AMSEndPoint != nullptr) {
+                EV << "address: " << AMSEndPoint["host"] << " port: " << AMSEndPoint["port"] << endl;
+                std::string address = AMSEndPoint["host"];
+                mecServices[AMS]->serviceAddress_ = L3AddressResolver().resolve(address.c_str());
+                mecServices[AMS]->servicePort_ = AMSEndPoint["port"];
+
+                // connect to service
+                cMessage *m = new cMessage("amsConnectMessage");
+                scheduleAt(simTime()+0.005, m);
+            }
+            if (LSEndPoint != nullptr) {
+                EV << "address: " << LSEndPoint["host"] << " port: " << LSEndPoint["port"] << endl;
+                std::string address = LSEndPoint["host"];
+
+                mecServices[LS] = new MecServiceSocketInfo;
+                mecServices[LS]->serviceAddress_ = L3AddressResolver().resolve(address.c_str());
+                mecServices[LS]->servicePort_ = LSEndPoint["port"];
+                mecServices[LS]->serviceSocket_ = addNewSocket();
+            }
+            if (RNISEndPoint != nullptr) {
+                EV << "address: " << RNISEndPoint["host"] << " port: " << RNISEndPoint["port"] << endl;
+                std::string address = RNISEndPoint["host"];
+                mecServices[RNIS] = new MecServiceSocketInfo;
+                mecServices[RNIS]->serviceAddress_ = L3AddressResolver().resolve(address.c_str());
+                mecServices[RNIS]->servicePort_ = RNISEndPoint["port"];
+                mecServices[RNIS]->serviceSocket_ = addNewSocket();
+                connect(mecServices[RNIS]->serviceSocket_, mecServices[RNIS]->serviceAddress_, mecServices[RNIS]->servicePort_);
+            }
+        }
+    }
+    catch (nlohmann::detail::parse_error e) {
+        EV << e.what() << std::endl;
+        // body is not correctly formatted in JSON, manage it
+        return;
+    }
+}
+
+void MecAppBase::handleAmsMessage(int connId) {
+    // todo: implement management for REQUEST and RESPONSE type messages from AMS
+    // registration/subscription response, event notifications, etc.
+    EV << "MecAppBase::handleAmsMessage " << endl;
+}
+
+void MecAppBase::established(int connId) {
+    if (mp1Socket_ != nullptr && connId == mp1Socket_->getSocketId()) {
+        EV << "MECAppBase::established - Mp1Socket" << endl;
+        // get endPoint of the required service
+        std::string uri;
+        if (isMobilityAware)
+            uri = "/example/mec_service_mgmt/v1/services?ser_name=ApplicationMobilityService," + requiredSerName_;
+        else
+            uri = "/example/mec_service_mgmt/v1/services?ser_name=" + requiredSerName_;
+
+        EV << "MECAppBase::established - URI: " << uri << endl;
+
+        std::string host = mp1Socket_->getRemoteAddress().str() + ":" + std::to_string(mp1Socket_->getRemotePort());
+
+        Http::sendGetRequest(mp1Socket_, host.c_str(), uri.c_str());
+        return;
+    }
+    else if(mecServices[AMS] != nullptr && connId == mecServices[AMS]->serviceSocket_->getSocketId()) {
+        EV << "MecAppBase::established - AMSSocket"<< endl;
+
+        // Send registration
+
+        return;
+    } else {
+        throw cRuntimeError("MecAppBase::socketEstablished - Socket %d not recognized", connId);
     }
 }
 

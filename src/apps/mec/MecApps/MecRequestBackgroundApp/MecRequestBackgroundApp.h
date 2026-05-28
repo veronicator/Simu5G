@@ -29,10 +29,7 @@ class MecRequestBackgroundApp : public MecAppBase
     cMessage *sendBurst = nullptr;
 
     double lambda; // it is the mean, not the rate
-    inet::TcpSocket *serviceSocket_ = nullptr;
-    inet::TcpSocket *mp1Socket_ = nullptr;
 
-    HttpBaseMessage *mp1HttpMessage = nullptr;
     HttpBaseMessage *serviceHttpMessage = nullptr;
 
     void handleSelfMessage(cMessage *msg) override;
@@ -42,7 +39,7 @@ class MecRequestBackgroundApp : public MecAppBase
 
     void handleHttpMessage(int connId) override;
     void handleServiceMessage(int connId) override;
-    void handleMp1Message(int connId) override;
+    void handleMp1Message(int connId) override {};
 
     void handleUeMessage(cMessage *msg) override {};
 

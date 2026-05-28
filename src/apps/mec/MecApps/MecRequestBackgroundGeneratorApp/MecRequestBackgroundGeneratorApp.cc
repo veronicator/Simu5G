@@ -32,7 +32,7 @@ MecRequestBackgroundGeneratorApp::~MecRequestBackgroundGeneratorApp()
 
 void MecRequestBackgroundGeneratorApp::handleServiceMessage(int connId)
 {
-    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(serviceSocket_->getUserData());
+    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(mecServices[LS]->serviceSocket_->getUserData());
     serviceHttpMessage = check_and_cast<HttpBaseMessage *>(msgStatus->httpMessageQueue.front());
     EV << "payload: " << serviceHttpMessage->getBody() << endl;
     if (burstFlag)
@@ -44,13 +44,10 @@ void MecRequestBackgroundGeneratorApp::established(int connId)
     if (connId == mp1Socket_->getSocketId()) {
         EV << "MecRequestBackgroundGeneratorApp::established - Mp1Socket" << endl;
         // get endPoint of the required service
-        const char *uri = "/example/mec_service_mgmt/v1/services?ser_name=LocationService";
-        std::string host = mp1Socket_->getRemoteAddress().str() + ":" + std::to_string(mp1Socket_->getRemotePort());
-
-        Http::sendGetRequest(mp1Socket_, host.c_str(), uri);
-        return;
+        requiredSerName_ = "LocationService";
+        MecAppBase::established(connId);
     }
-    else if (connId == serviceSocket_->getSocketId()) {
+    else if (connId == mecServices[LS]->serviceSocket_->getSocketId()) {
         EV << "MecRequestBackgroundGeneratorApp::established - serviceSocket" << endl;
         scheduleAt(simTime() + 5, burstTimer);
     }
@@ -74,14 +71,9 @@ void MecRequestBackgroundGeneratorApp::handleSelfMessage(cMessage *msg) {
     else if (strcmp(msg->getName(), "sendBurst") == 0) {
         sendBulkRequest();
     }
-    else if (strcmp(msg->getName(), "connectMp1") == 0) {
-        EV << "MecAppBase::handleMessage- " << msg->getName() << endl;
-        connect(mp1Socket_, mp1Address, mp1Port);
-        delete msg;
-    }
     else if (strcmp(msg->getName(), "connectService") == 0) {
         EV << "MecAppBase::handleMessage- " << msg->getName() << endl;
-        connect(serviceSocket_, serviceAddress, servicePort);
+        connect(mecServices[LS]->serviceSocket_, mecServices[LS]->serviceAddress_, mecServices[LS]->servicePort_);
     }
     else {
         EV << "MecRequestBackgroundGeneratorApp::handleSelfMessage - selfMessage not recognized" << endl;
@@ -92,43 +84,13 @@ void MecRequestBackgroundGeneratorApp::handleSelfMessage(cMessage *msg) {
 void MecRequestBackgroundGeneratorApp::handleHttpMessage(int connId)
 {
     if (mp1Socket_ != nullptr && connId == mp1Socket_->getSocketId()) {
-        handleMp1Message(connId);
+        return;
     }
     else {
         handleServiceMessage(connId);
     }
 }
 
-void MecRequestBackgroundGeneratorApp::handleMp1Message(int connId)
-{
-    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(mp1Socket_->getUserData());
-    mp1HttpMessage = check_and_cast<HttpBaseMessage *>(msgStatus->httpMessageQueue.front());
-    EV << "MEWarningAlertApp_rest::handleMp1Message - payload: " << mp1HttpMessage->getBody() << endl;
-
-    try {
-        nlohmann::json jsonBody = nlohmann::json::parse(mp1HttpMessage->getBody()); // get the JSON structure
-        if (!jsonBody.empty()) {
-            jsonBody = jsonBody[0];
-            std::string serName = jsonBody["serName"];
-            if (serName == "LocationService") {
-                if (jsonBody.contains("transportInfo")) {
-                    nlohmann::json endPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
-                    EV << "address: " << endPoint["host"] << " port: " << endPoint["port"] << endl;
-                    std::string address = endPoint["host"];
-                    serviceAddress = L3AddressResolver().resolve(address.c_str());
-                    servicePort = endPoint["port"];
-                    serviceSocket_ = addNewSocket();
-                    connect(serviceSocket_, serviceAddress, servicePort);
-                }
-            }
-        }
-    }
-    catch (nlohmann::detail::parse_error e) {
-        EV << e.what() << std::endl;
-        // body is not correctly formatted in JSON, manage it
-        return;
-    }
-}
 
 void MecRequestBackgroundGeneratorApp::initialize(int stage) {
     MecAppBase::initialize(stage);
@@ -150,14 +112,11 @@ void MecRequestBackgroundGeneratorApp::initialize(int stage) {
                 EV << "MecRequestBackgroundGeneratorApp::initialize - MecRequestBackgroundGeneratorApp [" << mecAppId << "] does not allocate MEC host resources" << endl;
             }
 
-            mp1Socket_ = addNewSocket();
-            cMessage *m = new cMessage("connectMp1");
             sendBurst = new cMessage("sendBurst");
             burstPeriod = new cMessage("burstPeriod");
             burstTimer = new cMessage("burstTimer");
             burstFlag = false;
             mecAppId = getId();
-            scheduleAt(simTime() + 0.055, m);
         }
     }
 }
@@ -166,7 +125,7 @@ void MecRequestBackgroundGeneratorApp::sendBulkRequest() {
     int numRequests = truncnormal(numberOfApplications_, 20, 2);
     std::string payload = "BulkRequest: " + std::to_string(numRequests + 1);
 
-    Http::sendPacket(payload.c_str(), serviceSocket_);
+    Http::sendPacket(payload.c_str(), mecServices[LS]->serviceSocket_);
 
     EV << "MecRequestBackgroundGeneratorApp: " << numRequests << " requests to the server" << endl;
 }

@@ -30,10 +30,6 @@ class MecRequestBackgroundGeneratorApp : public MecAppBase
     bool burstFlag;
     cMessage *sendBurst = nullptr;
 
-    inet::TcpSocket *serviceSocket_ = nullptr;
-    inet::TcpSocket *mp1Socket_ = nullptr;
-
-    HttpBaseMessage *mp1HttpMessage = nullptr;
     HttpBaseMessage *serviceHttpMessage = nullptr;
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }
     void initialize(int stage) override;
@@ -41,7 +37,7 @@ class MecRequestBackgroundGeneratorApp : public MecAppBase
     void handleSelfMessage(cMessage *msg) override;
     void handleHttpMessage(int connId) override;
     void handleServiceMessage(int connId) override;
-    void handleMp1Message(int connId) override;
+    void handleMp1Message(int connId) override {};
 
     virtual void sendBulkRequest();
 

@@ -32,13 +32,9 @@ using namespace omnetpp;
 class MECResponseApp : public MecAppBase
 {
   protected:
-    inet::TcpSocket *mp1Socket_ = nullptr;
-    inet::TcpSocket *serviceSocket_ = nullptr;
 
     inet::UdpSocket ueAppSocket_;
     int localUePort_;
-
-    HttpBaseMessage *mp1HttpMessage = nullptr;
 
     cMessage *currentRequestfMsg_ = nullptr;
     cMessage *processingTimer_ = nullptr;
@@ -56,11 +52,6 @@ class MECResponseApp : public MecAppBase
     inet::L3Address ueAppAddress;
     int ueAppPort;
 
-    // endpoint for contacting the Location Service
-    // this is obtained by sending a GET request to the Service Registry as soon as
-    // the connection with the latter has been established
-    inet::L3Address serviceAddress_;
-    int servicePort_;
 
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }
     void initialize(int stage) override;
@@ -73,7 +64,7 @@ class MECResponseApp : public MecAppBase
     double scheduleNextMsg(cMessage *msg) override;
 
     // @brief handler for data received from the service registry
-    void handleMp1Message(int connId) override;
+    void handleMp1Message(int connId) override {};
 
     // @brief handler for data received from a MEC service
     void handleServiceMessage(int connId) override;

@@ -54,10 +54,6 @@ class MECWarningAlertApp : public MecAppBase
     inet::L3Address ueAppAddress;
     int ueAppPort;
 
-    inet::TcpSocket *serviceSocket_ = nullptr;
-    inet::TcpSocket *mp1Socket_ = nullptr;
-
-    HttpBaseMessage *mp1HttpMessage = nullptr;
     HttpBaseMessage *serviceHttpMessage = nullptr;
 
     int size_;
@@ -78,7 +74,7 @@ class MECWarningAlertApp : public MecAppBase
 
     void handleHttpMessage(int connId) override;
     void handleServiceMessage(int connId) override;
-    void handleMp1Message(int connId) override;
+    void handleMp1Message(int connId) override {};
     void handleUeMessage(cMessage *msg) override;
 
     virtual void modifySubscription();

@@ -25,10 +25,6 @@ class MecRequestForegroundApp : public MecAppBase
   protected:
     cMessage *sendFGRequest = nullptr;
 
-    inet::TcpSocket *serviceSocket_ = nullptr;
-    inet::TcpSocket *mp1Socket_ = nullptr;
-
-    HttpBaseMessage *mp1HttpMessage = nullptr;
     HttpBaseMessage *serviceHttpMessage = nullptr;
 
     void handleSelfMessage(cMessage *msg) override;
@@ -38,7 +34,7 @@ class MecRequestForegroundApp : public MecAppBase
 
     void handleHttpMessage(int connId) override;
     void handleServiceMessage(int connId) override;
-    void handleMp1Message(int connId) override;
+    void handleMp1Message(int connId) override {};
 
     void handleUeMessage(cMessage *msg) override {};
 

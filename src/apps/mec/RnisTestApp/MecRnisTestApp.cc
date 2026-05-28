@@ -49,11 +49,6 @@ void MecRnisTestApp::initialize(int stage)
     //testing
     EV << "MecRnisTestApp::initialize - Mec application " << getClassName() << " with mecAppId[" << mecAppId << "] has started!" << endl;
 
-    mp1Socket_ = addNewSocket();
-
-    // connect with the service registry
-    cMessage *msg = new cMessage("connectMp1");
-    scheduleAt(simTime() + 0, msg);
 }
 
 void MecRnisTestApp::finish()
@@ -134,7 +129,7 @@ void MecRnisTestApp::handleUeMessage(cMessage *msg)
 
 void MecRnisTestApp::sendQuery(int cellId, std::string ueIpv4Address)
 {
-    std::string host = serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(serviceSocket_->getRemotePort());
+    std::string host = mecServices[RNIS]->serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(mecServices[RNIS]->serviceSocket_->getRemotePort());
 
     std::string uri = "/example/rni/v2/queries/layer2_meas";
 
@@ -165,7 +160,7 @@ void MecRnisTestApp::sendQuery(int cellId, std::string ueIpv4Address)
 
     EV << "MecRnisTestApp::sendQuery - GET request, Host[" << host << "] URI[" << uri << "]" << endl;
 
-    Http::sendGetRequest(serviceSocket_, host.c_str(), uri.c_str());
+    Http::sendGetRequest(mecServices[RNIS]->serviceSocket_, host.c_str(), uri.c_str());
 }
 
 void MecRnisTestApp::established(int connId)
@@ -173,14 +168,10 @@ void MecRnisTestApp::established(int connId)
     if (connId == mp1Socket_->getSocketId()) {
         EV << "MecRnisTestApp::established - Mp1Socket" << endl;
         // get endPoint of the required service
-        const char *uri = "/example/mec_service_mgmt/v1/services?ser_name=RNIService";
-        std::string host = mp1Socket_->getRemoteAddress().str() + ":" + std::to_string(mp1Socket_->getRemotePort());
-
-        EV << "MecRnisTestApp::established - connecting to service RNIService" << endl;
-
-        Http::sendGetRequest(mp1Socket_, host.c_str(), uri);
+        requiredSerName_ = "RNIService";
+        MecAppBase::established(connId);
     }
-    else if (connId == serviceSocket_->getSocketId()) {
+    else if (connId == mecServices[RNIS]->serviceSocket_->getSocketId()) {
         EV << "MecRnisTestApp::established - serviceSocket" << endl;
 
         EV << "MecRnisTestApp::established - connection to the RNIService done... sending ACK to the UE" << endl;
@@ -214,54 +205,18 @@ void MecRnisTestApp::established(int connId)
 void MecRnisTestApp::handleHttpMessage(int connId)
 {
     if (mp1Socket_ != nullptr && connId == mp1Socket_->getSocketId()) {
-        handleMp1Message(connId);
+//        handleMp1Message(connId);
+        return;
     }
     else {
         handleServiceMessage(connId);
     }
 }
 
-void MecRnisTestApp::handleMp1Message(int connId)
-{
-    // for now I only have one Service Registry
-    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(mp1Socket_->getUserData());
-    mp1HttpMessage = check_and_cast_nullable<HttpBaseMessage *>(msgStatus->httpMessageQueue.front());
-    EV << "MecRnisTestApp::handleMp1Message - payload: " << mp1HttpMessage->getBody() << endl;
-
-    try {
-        nlohmann::json jsonBody = nlohmann::json::parse(mp1HttpMessage->getBody()); // get the JSON structure
-        if (!jsonBody.empty()) {
-            jsonBody = jsonBody[0];
-            std::string serName = jsonBody["serName"];
-            if (serName == "RNIService") {
-                if (jsonBody.contains("transportInfo")) {
-                    nlohmann::json endPoint = jsonBody["transportInfo"]["endPoint"]["addresses"];
-                    EV << "Obtained endpoint for RNIService - address: " << endPoint["host"] << " port: " << endPoint["port"] << endl;
-
-                    std::string address = endPoint["host"];
-                    serviceAddress = L3AddressResolver().resolve(address.c_str());
-                    servicePort = endPoint["port"];
-                    serviceSocket_ = addNewSocket();
-
-                    EV << "Creating new socket for communicating with RNIService" << endl;
-                }
-            }
-            else {
-                EV << "MecRnisTestApp::handleMp1Message - Radio Network Information Service not found" << endl;
-                serviceAddress = L3Address();
-            }
-        }
-    }
-    catch (nlohmann::detail::parse_error e) {
-        EV << e.what() << std::endl;
-        // body is not correctly formatted in JSON, manage it
-        return;
-    }
-}
 
 void MecRnisTestApp::handleServiceMessage(int connId)
 {
-    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(serviceSocket_->getUserData());
+    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(mecServices[RNIS]->serviceSocket_->getUserData());
     serviceHttpMessage = check_and_cast_nullable<HttpBaseMessage *>(msgStatus->httpMessageQueue.front());
 
     if (serviceHttpMessage->getType() == REQUEST) {
@@ -303,20 +258,16 @@ void MecRnisTestApp::handleServiceMessage(int connId)
 
 void MecRnisTestApp::handleSelfMessage(cMessage *msg)
 {
-    if (strcmp(msg->getName(), "connectMp1") == 0) {
+        if (strcmp(msg->getName(), "connectService") == 0) {
         EV << "MecAppBase::handleMessage- " << msg->getName() << endl;
-        connect(mp1Socket_, mp1Address, mp1Port);
-    }
-    else if (strcmp(msg->getName(), "connectService") == 0) {
-        EV << "MecAppBase::handleMessage- " << msg->getName() << endl;
-        if (!serviceAddress.isUnspecified() && serviceSocket_->getState() != inet::TcpSocket::CONNECTED) {
+        if (!mecServices[RNIS]->serviceAddress_.isUnspecified() && mecServices[RNIS]->serviceSocket_->getState() != inet::TcpSocket::CONNECTED) {
             EV << "MecRnisTestApp::handleSelfMessage - socket has already been created... now connecting to the RNIService" << endl;
-            connect(serviceSocket_, serviceAddress, servicePort);
+            connect(mecServices[RNIS]->serviceSocket_, mecServices[RNIS]->serviceAddress_, mecServices[RNIS]->servicePort_);
         }
         else {
-            if (serviceAddress.isUnspecified())
+            if (mecServices[RNIS]->serviceAddress_.isUnspecified())
                 EV << "MecRnisTestApp::handleSelfMessage - service IP address is unspecified (maybe response from the service registry is arriving)" << endl;
-            else if (serviceSocket_->getState() == inet::TcpSocket::CONNECTED)
+            else if (mecServices[RNIS]->serviceSocket_->getState() == inet::TcpSocket::CONNECTED)
                 EV << "MecRnisTestApp::handleSelfMessage - service socket is already connected" << endl;
 
             EV << "MecRnisTestApp::handleSelfMessage - socket has not been created for some reason... cannot connect to the RNIService, now sending NACK to UE" << endl;
