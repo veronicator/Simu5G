@@ -27,6 +27,8 @@
 #include "nodes/mec/MECPlatform/ServiceRegistry/ServiceRegistry.h"
 #include "nodes/mec/VirtualisationInfrastructureManager/VirtualisationInfrastructureManager.h"
 
+#include "nodes/mec/MECPlatform/MECServices/ApplicationMobilityService/resources/MobilityProcedureNotification.h"
+
 namespace simu5g {
 
 using namespace omnetpp;
@@ -64,6 +66,14 @@ struct MecServiceSocketInfo {
 class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
 {
   protected:
+
+    //UDP socket to communicate with the UeApp
+    inet::UdpSocket ueSocket;
+    int localUePort;
+
+    inet::L3Address ueAppAddress;
+    int ueAppPort;
+
     /* TCP sockets are dynamically created by the user according to her needs
      * the HttpBaseMessage* will be linked to the userData variable in TCPSocket class
      * The base implementation already provides one socket to the ServiceRegistry and one socket to a MEC service
@@ -85,6 +95,29 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     inet::TcpSocket *mp1Socket_ = nullptr;
     inet::L3Address mp1Address;
     int mp1Port;
+
+    // ams v1
+    std::string webHook;
+
+//    bool isMigrating;
+//    bool isMigrated;
+    inet::L3Address migrationAddress;
+    int migrationPort;
+//    std::string status; // keeps trace of ue position
+    inet::TcpSocket* stateSocket_;
+    inet::TcpSocket serverSocket_;
+    inet::L3Address localAddress;
+    // ams response counter
+    int responsecounter;
+
+    bool registered;
+    bool subscribed;
+    std::string amsRegistrationId;
+    std::string amsSubscriptionId;
+//    std::string amsSubscriptionId_completed;
+    // ams v1
+
+    HttpBaseMessage *amsHttpMessage = nullptr;
 
     // FIXME not used, yet. These structures are supposed to be used
     cQueue serviceHttpMessages_;

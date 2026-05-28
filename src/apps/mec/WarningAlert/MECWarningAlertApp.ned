@@ -32,4 +32,6 @@ simple MECWarningAlertApp extends MecAppBase
         int localUePort;
 
         bool logger = default(false);
+
+        isMobilityAware = true;
 }

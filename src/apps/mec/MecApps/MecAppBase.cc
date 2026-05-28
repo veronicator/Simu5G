@@ -70,6 +70,14 @@ void MecAppBase::initialize(int stage)
     scheduleAt(simTime() + 0, msg);
 
     processMessage_ = new cMessage("processedMessage");
+    // AMS
+    localAddress = L3AddressResolver().resolve(getParentModule()->getFullPath().c_str());
+
+    responsecounter = 0;
+
+    webHook="/amsWebHook_" + std::to_string(getId());
+    // AMS
+
 }
 
 void MecAppBase::connect(inet::TcpSocket *socket, const inet::L3Address& address, const int port)
@@ -164,11 +172,34 @@ void MecAppBase::handleMessage(cMessage *msg)
             }
 
         }
+        else if (strcmp(msg->getName(), "subscribeAms") == 0){
+            EV << "MecAppBase::handleMessage sending subscription" << endl;
+            EV << getParentModule()->getFullPath() << endl;
+            nlohmann::ordered_json subscriptionBody_;
+            subscriptionBody_ = nlohmann::ordered_json();
+            subscriptionBody_["_links"]["self"]["href"] = "";
+            subscriptionBody_["callbackReference"] = localAddress.str() + ":" + std::to_string(par("localUePort").intValue()) + webHook;
+            subscriptionBody_["requestTestNotification"] = false;
+            subscriptionBody_["websockNotifConfig"]["websocketUri"] = "";
+            subscriptionBody_["websockNotifConfig"]["requestWebsocketUri"] = false;
+            subscriptionBody_["filterCriteria"]["appInstanceId"] = getName();
+            subscriptionBody_["filterCriteria"]["associateId"] = nlohmann::json::array();
+            subscriptionBody_["filterCriteria"]["mobilityStatus"] = nlohmann::json::array();
+            subscriptionBody_["filterCriteria"]["mobilityStatus"].push_back("INTERHOST_MOVEOUT_TRIGGERED");
+            subscriptionBody_["subscriptionType"] = "MobilityProcedureSubscription";
+            EV << subscriptionBody_;
+
+            std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str()+":"+std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());
+            std::string uristring = "/example/amsi/v1/subscriptions/";
+            Http::sendPostRequest(mecServices[AMS]->serviceSocket_, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
+            responsecounter++;
+        }
         else {
             handleSelfMessage(msg);
         }
     }
     else {
+        EV << "MecAppBase::handleMessage() - NOT selfMessage " << endl;
         if (!processMessage_->isScheduled() && packetQueue_.isEmpty()) {
             packetQueue_.insert(msg);
             double processingTime;
@@ -275,9 +306,96 @@ void MecAppBase::handleMp1Message(int connId) {
 }
 
 void MecAppBase::handleAmsMessage(int connId) {
-    // todo: implement management for REQUEST and RESPONSE type messages from AMS
+    // todo: implement handler for REQUEST and RESPONSE type messages from AMS
     // registration/subscription response, event notifications, etc.
     EV << "MecAppBase::handleAmsMessage " << endl;
+    HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(mecServices[AMS]->serviceSocket_->getUserData());
+    amsHttpMessage = check_and_cast_nullable<HttpBaseMessage *>(msgStatus->httpMessageQueue.front());
+    try {
+        if(amsHttpMessage->getType() == REQUEST) {
+            EV << "MecAppBase::handleAmsMessage - Received request - payload: " << " " << amsHttpMessage->getBody() << endl;
+            HttpRequestMessage* amsRequest = check_and_cast<HttpRequestMessage*>(amsHttpMessage);
+            nlohmann::json jsonBody = nlohmann::json::parse(amsRequest->getBody());
+
+
+            if(std::string(amsRequest->getUri()).compare(webHook) == 0 && !jsonBody.empty()){
+                MobilityProcedureNotification *notification = new MobilityProcedureNotification();
+                notification->fromJson(jsonBody);
+                std::string type = notification->getMobilityStatusString();
+                if(type.empty()){
+                    throw cRuntimeError("mobility status not specified in the notification");
+                }
+
+                EV << "MecAppBase::handleAmsMessage - Analyzing notification - payload: " << " " << amsHttpMessage->getBody() << endl;
+                if(type.compare("INTERHOST_MOVEOUT_TRIGGERED") == 0 && jsonBody.contains("targetAppInfo")){
+                   TargetAppInfo* targetAppInfo = new TargetAppInfo();
+                   targetAppInfo->fromJson(jsonBody["targetAppInfo"]);
+
+                   if(targetAppInfo->getCommInterface().size() != 0 && targetAppInfo->getCommInterface()[0].addr != localAddress){
+                       EV << "MecAppBase::handleAmsMessage - Analyzing notification - TargetAppInfo found: " << " " << amsHttpMessage->getBody() << endl;
+                       migrationAddress = targetAppInfo->getCommInterface()[0].addr;
+                       migrationPort = targetAppInfo->getCommInterface()[0].port;
+//                       cMessage *m = new cMessage("migrateState");
+//                       scheduleAt(simTime()+0.005, m);
+                   }
+                }
+                else if(type.compare("INTERHOST_MOVEOUT_COMPLETED") == 0 && jsonBody.contains("targetAppInfo")){
+
+//                    cMessage *m = new cMessage("deleteRegistration");
+//                    scheduleAt(simTime()+0.005, m);
+//
+//                    cMessage *d = new cMessage("deleteModule");
+//                    scheduleAt(simTime()+0.7, d);
+
+                    EV << "MecAppBase::handleAmsMessage - Deletion has been scheduled" << endl;
+                }
+            }
+
+        }
+        else if(amsHttpMessage->getType() == RESPONSE){
+            responsecounter--;
+            EV << "MecAppBase::handleAmsMessage - Received response - payload: " << " " << amsHttpMessage->getBody() << endl;
+            HttpResponseMessage* amsResponse = check_and_cast<HttpResponseMessage*>(amsHttpMessage);
+
+            nlohmann::json jsonBody = nlohmann::json::parse(amsResponse->getBody());
+            if(!jsonBody.empty()){
+                if(jsonBody.contains("appMobilityServiceId"))
+                {
+                    amsRegistrationId = jsonBody["appMobilityServiceId"];
+                    registered = true;
+                    EV << "MecAppBase::handleAmsMessage - registration ID: " << amsRegistrationId << endl;
+
+                    cMessage *m = new cMessage("subscribeAms");
+                    scheduleAt(simTime()+0.001, m);
+                }
+                else if(jsonBody.contains("callbackReference")){
+
+                    std::stringstream stream;
+                    stream << "sub" << jsonBody["subscriptionId"];
+                    amsSubscriptionId = stream.str();
+                    EV << "MecAppBase::handleAmsMessage - subscription ID triggered: " << amsSubscriptionId << endl;
+
+
+
+                    if(!amsSubscriptionId.empty())
+                    {
+                        subscribed = true;
+                    }
+
+                }
+            }
+        }
+        else{
+            EV << "MecAppBase::handleAmsMessage - Message type not recognized " << endl;
+
+        }
+    }
+    catch(nlohmann::detail::parse_error e)
+    {
+        EV <<  e.what() << std::endl;
+        // body is not correctly formatted in JSON, manage it
+        return;
+    }
 }
 
 void MecAppBase::established(int connId) {
@@ -301,6 +419,31 @@ void MecAppBase::established(int connId) {
         EV << "MecAppBase::established - AMSSocket"<< endl;
 
         // Send registration
+        // todo for HMS add a new field (isMobile/mobileMecHost) in the registration request
+
+        nlohmann::ordered_json registrationBody;
+        registrationBody = nlohmann::ordered_json();
+        registrationBody["serviceConsumerId"]["appInstanceId"] = std::string(getName());
+        registrationBody["serviceConsumerId"]["mepId"] = "";
+        registrationBody["deviceInformation"] = nlohmann::json::array();
+        if(!ueAppAddress.isUnspecified() && ueAppPort > 0){
+            nlohmann::ordered_json deviceInformation;
+            nlohmann::ordered_json associateId;
+
+            associateId["type"] = "UE_IPv4_ADDRESS";
+            associateId["value"] = ueAppAddress.str();
+            deviceInformation["associateId"] = associateId;
+            deviceInformation["appMobilityServiceLevel"] = "APP_MOBILITY_NOT_ALLOWED";
+            deviceInformation["contextTransferState"] = "NOT_TRANSFERRED";
+
+            registrationBody["deviceInformation"].push_back(deviceInformation);
+        }
+
+        EV << "Registration with body" << registrationBody.dump().c_str() << endl;
+        std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());
+        const char *uri = "/example/amsi/v1/app_mobility_services/";
+        Http::sendPostRequest(mecServices[AMS]->serviceSocket_, registrationBody.dump().c_str(), host.c_str(), uri);
+        responsecounter++;
 
         return;
     } else {

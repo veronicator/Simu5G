@@ -1,0 +1,61 @@
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+// 
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see http://www.gnu.org/licenses/.
+// 
+
+#ifndef NODES_MEC_MECPLATFORM_MECSERVICES_RESOURCES_NOTIFICATIONBASE_H_
+#define NODES_MEC_MECPLATFORM_MECSERVICES_RESOURCES_NOTIFICATIONBASE_H_
+#include <omnetpp.h>
+
+#include "AttributeBase.h"
+#include "TimeStamp.h"
+#include "nodes/mec/MECPlatform/EventNotification/EventNotification.h"
+#include "FilterCriteriaBase.h"
+#include "nodes/mec/MECPlatform/MECServices/RNIService/resources/AssociateId.h"
+
+
+namespace simu5g {
+
+
+/*
+ * This abstract class maintains common information of all ETSI notifications
+ * */
+class NotificationBase : public AttributeBase{
+  protected:
+    std::string notificationType_;
+    TimeStamp timestamp_;
+    std::vector<AssociateId> associateId_;
+    std::string links_; //optional no
+
+  public:
+    NotificationBase();
+    virtual ~NotificationBase();
+
+    virtual nlohmann::ordered_json toJson() const = 0;
+    virtual bool fromJson(const nlohmann::ordered_json& json);
+    virtual EventNotification* handleNotification(FilterCriteriaBase *filters, bool noCheck=false) = 0;
+
+
+    std::string getNotificationType() const{return notificationType_;}
+    TimeStamp getTimestamp(){return timestamp_;}
+    std::string getLinks() const {return links_;};
+    std::vector<AssociateId> getAssociateId() const{return associateId_;};
+
+    void setTimeStamp(TimeStamp t){timestamp_ = t;};
+    void setAssociateId(std::vector<AssociateId> associateId){associateId_ = associateId;};
+
+};
+
+}   // namespace
+
+#endif /* NODES_MEC_MECPLATFORM_MECSERVICES_RESOURCES_NOTIFICATIONBASE_H_ */

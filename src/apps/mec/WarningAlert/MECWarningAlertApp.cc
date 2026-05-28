@@ -183,7 +183,7 @@ void MECWarningAlertApp::established(int connId)
         MecAppBase::established(connId);
 
     }
-    else if (connId == mecServices[LS]->serviceSocket_->getSocketId()) {
+    else if (mecServices[LS] != nullptr && connId == mecServices[LS]->serviceSocket_->getSocketId()) {
         EV << "MECWarningAlertApp::established - serviceSocket" << endl;
         // the connectService message is scheduled after a start mec app from the UE app, so I can
         // respond to her here, once the socket is established

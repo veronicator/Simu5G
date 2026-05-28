@@ -20,6 +20,7 @@
 #include "nodes/mec/MECPlatform/MECServices/Resources/AttributeBase.h"
 #include "nodes/mec/MECPlatform/MECServices/Resources/TimeStamp.h"
 #include "nodes/mec/utils/httpUtils/httpUtils.h"
+#include "FilterCriteriaBase.h"
 
 namespace simu5g {
 
@@ -38,7 +39,10 @@ class SubscriptionBase
     void addEnodeB(cModule *eNodeB);
 
     virtual void set_links(const std::string& link);
+    //
+    virtual void setFilterCriteria(FilterCriteriaBase* filterCriteria){ filterCriteria_ = filterCriteria;}
 
+    virtual nlohmann::ordered_json toJson() const {nlohmann::ordered_json val; return val; }
     virtual bool fromJson(const nlohmann::ordered_json& json);
     virtual void sendSubscriptionResponse() = 0;
     virtual void sendNotification(EventNotification *event) = 0;
@@ -47,6 +51,9 @@ class SubscriptionBase
     virtual std::string getSubscriptionType() const;
     virtual int getSubscriptionId() const;
     virtual int getSocketConnId() const;
+    //
+    virtual FilterCriteriaBase* getFilterCriteria() const{return filterCriteria_;}
+    virtual void to_string(){};
   protected:
 
     inet::TcpSocket *socket_ = nullptr;
@@ -66,6 +73,11 @@ class SubscriptionBase
 
     std::string callbackReference_;
     TimeStamp expiryTime_;
+    /*
+     *  needed for Application Mobility Service
+     *  (shared by MobilityProcedureSubscription and AdjacentAppInfoSubscription)
+     */
+    FilterCriteriaBase* filterCriteria_;
 };
 
 } //namespace
