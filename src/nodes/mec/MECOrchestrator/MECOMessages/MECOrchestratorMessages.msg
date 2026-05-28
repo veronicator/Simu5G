@@ -34,9 +34,6 @@ class CreateAppMessage extends MECAppMessage {
     unsigned int sno;
     simtime_t timestamp;
     
-//    //type of message
-//    string type;
-    
     //communication informations
     string sourceAddress;
     int	   sourcePort;   // added by Alessandro Noferi
@@ -44,7 +41,6 @@ class CreateAppMessage extends MECAppMessage {
     int	   destinationPort;   // added by Alessandro Noferi
     string destinationMecAppAddress;
     int	   destinationMecAppPort;   // added by Alessandro Noferi
-    
     
     //instantiation informations
     string MEModuleType;			//path where to find the cModule of the MEApp to instantiate
@@ -70,9 +66,6 @@ class DeleteAppMessage extends MECAppMessage {
    
     unsigned int sno;
     simtime_t timestamp;
-    
-//    //type of message
-//    string type;
     
     //communication informations
     string sourceAddress;
@@ -106,9 +99,6 @@ class MigrateAppMessage extends MECAppMessage {
    
     unsigned int sno;
     simtime_t timestamp;
-    
-//    //type of message
-//    string type;
     
 //    //instantiation informations
 //    string MEModuleType;			//path where to find the cModule of the MEApp to instantiate

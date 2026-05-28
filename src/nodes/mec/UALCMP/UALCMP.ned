@@ -38,7 +38,7 @@ module UALCMP
         string gateway = default("upf");
 
         // hostname of the reference orchestrator
-        string mecOrchestratorHostname = default("mecOrchestrator.mecOrchestratorApp");	// default("mecOrchestrator");
+        string mecOrchestratorHostname = default("mecOrchestrator.mecOrchestratorApp");
 
         bool hasIpv4 = default(true);
         bool hasIpv6 = default(false);
@@ -63,9 +63,6 @@ module UALCMP
         //#
         //# ppp modules
         //#
-        //        pppIf[sizeof(ppp)]: PppInterface {
-        //            @display("p=550,508");
-        //        }
         pppIf: PppInterface {
             @display("p=446,506");
         }
@@ -161,12 +158,6 @@ module UALCMP
 
         ipv6.transportIn <-- tn.out++ if hasIpv6;
         ipv6.transportOut --> tn.in++ if hasIpv6;
-        //
-        //        for i=0..sizeof(ppp)-1 {
-        //            pppIf[i].upperLayerOut --> nl.in++;
-        //            pppIf[i].upperLayerIn <-- nl.out++;
-        //            pppIf[i].phys <--> gtpEndpoint.pppg++;
-        //        }
 
         pppIf.upperLayerOut --> nl.in++;
         pppIf.upperLayerIn <-- nl.out++;
