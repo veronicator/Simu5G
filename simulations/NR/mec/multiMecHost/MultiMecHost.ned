@@ -13,6 +13,7 @@ package simu5g.simulations.NR.mec.multiMecHost;
 import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
 import inet.networklayer.ipv4.RoutingTableRecorder;
 import inet.node.ethernet.Eth10G;
+import inet.node.inet.Router;
 import simu5g.common.binder.Binder;
 import simu5g.common.carrierAggregation.CarrierAggregation;
 import simu5g.nodes.NR.NRUe;
@@ -81,10 +82,15 @@ network MultiMecHost
             @display("p=748,247");
         }
         mecOrchestrator: MecOrchestrator {
-            @display("p=250,73");
+            @display("p=770,37");
         }
         ualcmp: UALCMP {
-            @display("p=390,73");
+            @display("p=616,37");
+        }
+
+        router: Router {
+
+            @display("p=705,124");
         }
 
     connections:
@@ -95,12 +101,17 @@ network MultiMecHost
         iUpf1.pppg++ <--> Eth10G <--> gnb1.ppp;
         iUpf2.pppg++ <--> Eth10G <--> gnb2.ppp;
 
+
+        router.pppg++ <--> Eth10G <--> upf.filterGate;
+        router.pppg++ <--> Eth10G <--> ualcmp.ppp++;
+        router.pppg++ <--> Eth10G <--> mecOrchestrator.ppp++;
+
         //# MEC-related connections
-        ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
+        //        ualcmp.ppp++ <--> Eth10G <--> upf.filterGate;
         ualcmp.toMecOrchestrator --> mecOrchestrator.fromUALCMP;
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
-        mecHost1.ppp++ <--> Eth10G <--> iUpf1.pppg++;
-        mecHost2.ppp++ <--> Eth10G <--> iUpf2.pppg++;
+        mecHost1.ppp++ <--> Eth10G <--> iUpf1.filterGate;
+        mecHost2.ppp++ <--> Eth10G <--> iUpf2.filterGate;
 
         //# X2 connections
         gnb1.x2++ <--> Eth10G <--> gnb2.x2++;
