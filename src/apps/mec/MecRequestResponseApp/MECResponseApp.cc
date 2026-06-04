@@ -212,6 +212,9 @@ void MECResponseApp::established(int connId)
         MecAppBase::established(connId);
 
     }
+    else {
+        MecAppBase::established(connId);
+    }
 }
 
 void MECResponseApp::socketClosed(inet::TcpSocket *sock)

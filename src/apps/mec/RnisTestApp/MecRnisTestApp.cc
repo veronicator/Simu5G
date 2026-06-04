@@ -198,7 +198,8 @@ void MecRnisTestApp::established(int connId)
         }
     }
     else {
-        throw cRuntimeError("MecAppBase::socketEstablished - Socket %d not recognized", connId);
+        MecAppBase::established(connId);
+//        throw cRuntimeError("MecAppBase::socketEstablished - Socket %d not recognized", connId);
     }
 }
 

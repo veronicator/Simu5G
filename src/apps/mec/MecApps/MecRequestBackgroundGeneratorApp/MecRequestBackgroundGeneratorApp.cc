@@ -52,7 +52,8 @@ void MecRequestBackgroundGeneratorApp::established(int connId)
         scheduleAt(simTime() + 5, burstTimer);
     }
     else {
-        throw cRuntimeError("MecRequestBackgroundGeneratorApp::socketEstablished - Socket %d not recognized", connId);
+        MecAppBase::established(connId);
+//        throw cRuntimeError("MecRequestBackgroundGeneratorApp::socketEstablished - Socket %d not recognized", connId);
     }
 }
 

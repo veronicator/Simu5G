@@ -73,7 +73,8 @@ void MecRequestForegroundApp::established(int connId)
 
     }
     else {
-        throw cRuntimeError("MecRequestBackgroundApp::socketEstablished - Socket %d not recognized", connId);
+        MecAppBase::established(connId);
+//        throw cRuntimeError("MecRequestBackgroundApp::socketEstablished - Socket %d not recognized", connId);
     }
 }
 

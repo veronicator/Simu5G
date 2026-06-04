@@ -269,7 +269,7 @@ void MecAppBase::handleMp1Message(int connId) {
             }   // end for
 
             if (AMSEndPoint != nullptr) {
-                EV << "address: " << AMSEndPoint["host"] << " port: " << AMSEndPoint["port"] << endl;
+                EV << "AMS address: " << AMSEndPoint["host"] << " port: " << AMSEndPoint["port"] << endl;
                 std::string address = AMSEndPoint["host"];
                 mecServices[AMS]->serviceAddress_ = L3AddressResolver().resolve(address.c_str());
                 mecServices[AMS]->servicePort_ = AMSEndPoint["port"];
@@ -279,7 +279,7 @@ void MecAppBase::handleMp1Message(int connId) {
                 scheduleAt(simTime()+0.005, m);
             }
             if (LSEndPoint != nullptr) {
-                EV << "address: " << LSEndPoint["host"] << " port: " << LSEndPoint["port"] << endl;
+                EV << "LS address: " << LSEndPoint["host"] << " port: " << LSEndPoint["port"] << endl;
                 std::string address = LSEndPoint["host"];
 
                 mecServices[LS] = new MecServiceSocketInfo;
@@ -288,7 +288,7 @@ void MecAppBase::handleMp1Message(int connId) {
                 mecServices[LS]->serviceSocket_ = addNewSocket();
             }
             if (RNISEndPoint != nullptr) {
-                EV << "address: " << RNISEndPoint["host"] << " port: " << RNISEndPoint["port"] << endl;
+                EV << "RNIS address: " << RNISEndPoint["host"] << " port: " << RNISEndPoint["port"] << endl;
                 std::string address = RNISEndPoint["host"];
                 mecServices[RNIS] = new MecServiceSocketInfo;
                 mecServices[RNIS]->serviceAddress_ = L3AddressResolver().resolve(address.c_str());
@@ -375,13 +375,10 @@ void MecAppBase::handleAmsMessage(int connId) {
                     amsSubscriptionId = stream.str();
                     EV << "MecAppBase::handleAmsMessage - subscription ID triggered: " << amsSubscriptionId << endl;
 
-
-
                     if(!amsSubscriptionId.empty())
                     {
                         subscribed = true;
                     }
-
                 }
             }
         }
@@ -446,8 +443,10 @@ void MecAppBase::established(int connId) {
         responsecounter++;
 
         return;
-    } else {
-        throw cRuntimeError("MecAppBase::socketEstablished - Socket %d not recognized", connId);
+    }
+    else {
+        EV << "MecAppBase::established - Socket " << connId << " not recognized" << endl;
+//        throw cRuntimeError("MecAppBase::socketEstablished - Socket %d not recognized", connId);
     }
 }
 

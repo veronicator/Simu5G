@@ -243,6 +243,14 @@ void MECResponseCbrApp::established(int connId)
         MecAppBase::established(connId);
 
     }
+    else if (mecServices[RNIS] != nullptr && connId == mecServices[RNIS]->serviceSocket_->getSocketId()) {
+
+        EV << "MECResponseCbrApp::established - RNISSocket" << endl;
+    }
+    else {
+        MecAppBase::established(connId);
+
+    }
 }
 
 void MECResponseCbrApp::socketClosed(inet::TcpSocket *sock)
