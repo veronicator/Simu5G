@@ -85,7 +85,7 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     MecServiceSocketInfo* mecServices[4] = {nullptr, nullptr, nullptr, nullptr};
     std::string requiredSerName_;
 
-    bool isMobilityAware;
+    bool mobilityAware;
 
     cQueue packetQueue_;
     cMessage *currentProcessedMsg_ = nullptr;

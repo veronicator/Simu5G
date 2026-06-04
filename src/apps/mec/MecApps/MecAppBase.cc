@@ -58,9 +58,9 @@ void MecAppBase::initialize(int stage)
     mp1Socket_ = addNewSocket();
 
 
-    isMobilityAware = par("isMobilityAware").boolValue();
+    mobilityAware = par("mobilityAware").boolValue();
 
-    if (isMobilityAware) {
+    if (mobilityAware) {
         mecServices[AMS] = new MecServiceSocketInfo;
         mecServices[AMS]->serviceSocket_ = addNewSocket();
     }
@@ -403,7 +403,7 @@ void MecAppBase::established(int connId) {
         EV << "MECAppBase::established - Mp1Socket" << endl;
         // get endPoint of the required service
         std::string uri;
-        if (isMobilityAware)
+        if (mobilityAware)
             uri = "/example/mec_service_mgmt/v1/services?ser_name=ApplicationMobilityService," + requiredSerName_;
         else
             uri = "/example/mec_service_mgmt/v1/services?ser_name=" + requiredSerName_;

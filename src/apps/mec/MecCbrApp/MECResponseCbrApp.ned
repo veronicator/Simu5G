@@ -33,7 +33,7 @@ simple MECResponseCbrApp extends MecAppBase
         int localUePort;
 
 		// param for AMS
-//        isMobilityAware = true;
+//        mobilityAware = true;
 
         int minInstructions = default(9000000);
         int maxInstructions = default(11000000);

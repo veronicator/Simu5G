@@ -33,5 +33,5 @@ simple MECWarningAlertApp extends MecAppBase
 
         bool logger = default(false);
 
-        isMobilityAware = true;
+        mobilityAware = true;
 }

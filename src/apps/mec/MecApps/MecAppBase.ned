@@ -22,7 +22,7 @@ simple MecAppBase like IMECApp, IApp
     parameters:
         @display("i=block/app;is=s");
 
-        bool isMobilityAware = default(false);
+        bool mobilityAware = default(false);
         int mecAppId;      // will be assigned by the VIM upon Mec App instantiation
 
         string mp1Address = default("");
