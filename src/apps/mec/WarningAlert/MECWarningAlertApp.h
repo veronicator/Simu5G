@@ -47,13 +47,6 @@ using namespace omnetpp;
 class MECWarningAlertApp : public MecAppBase
 {
 
-//    //UDP socket to communicate with the UeApp
-//    inet::UdpSocket ueSocket;
-//    int localUePort;
-//
-//    inet::L3Address ueAppAddress;
-//    int ueAppPort;
-
     HttpBaseMessage *serviceHttpMessage = nullptr;
 
     int size_;

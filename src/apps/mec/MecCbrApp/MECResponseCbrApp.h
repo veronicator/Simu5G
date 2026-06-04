@@ -33,9 +33,6 @@ class MECResponseCbrApp : public MecAppBase
 {
   protected:
 
-    inet::UdpSocket ueAppSocket_;
-    int localUePort_;
-
     cQueue requestPktQueue_;
     cMessage *requestMsg_ = nullptr;
     cMessage *currentRequestMsg_ = nullptr;
@@ -49,10 +46,6 @@ class MECResponseCbrApp : public MecAppBase
 
     int minInstructions_;
     int maxInstructions_;
-
-    // address+port of the UeApp
-    inet::L3Address ueAppAddress;
-    int ueAppPort;
 
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }
     void initialize(int stage) override;

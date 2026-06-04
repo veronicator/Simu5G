@@ -52,10 +52,10 @@ void MECWarningAlertApp::initialize(int stage)
     size_ = par("packetSize");
 
     // set Udp Socket
-    ueSocket.setOutputGate(gate("socketOut"));
+    ueAppSocket_.setOutputGate(gate("socketOut"));
 
-    localUePort = par("localUePort");
-    ueSocket.bind(localUePort);
+    localUePort_ = par("localUePort");
+    ueAppSocket_.bind(localUePort_);
 
     // testing
     EV << "MECWarningAlertApp::initialize - Mec application " << getClassName() << " with mecAppId[" << mecAppId << "] has started!" << endl;
@@ -73,8 +73,8 @@ void MECWarningAlertApp::handleUeMessage(cMessage *msg)
 {
     // determine its source address/port
     auto pk = check_and_cast<Packet *>(msg);
-    ueAppAddress = pk->getTag<L3AddressInd>()->getSrcAddress();
-    ueAppPort = pk->getTag<L4PortInd>()->getSrcPort();
+    ueAppAddress_ = pk->getTag<L3AddressInd>()->getSrcAddress();
+    ueAppPort_ = pk->getTag<L4PortInd>()->getSrcPort();
 
     auto mecPk = pk->peekAtFront<WarningAppPacket>();
 
@@ -118,7 +118,7 @@ void MECWarningAlertApp::modifySubscription()
                        "\"callbackData\":\"1234\","
                        "\"notifyURL\":\"example.com/notification/1234\"},"
                        "\"checkImmediate\": \"false\","
-                       "\"address\": \"" + ueAppAddress.str() + "\","
+                       "\"address\": \"" + ueAppAddress_.str() + "\","
                        "\"clientCorrelator\": \"null\","
                        "\"enteringLeavingCriteria\": \"Leaving\","
                        "\"frequency\": 5,"
@@ -142,7 +142,7 @@ void MECWarningAlertApp::sendSubscription()
                        "\"callbackData\":\"1234\","
                        "\"notifyURL\":\"example.com/notification/1234\"},"
                        "\"checkImmediate\": \"false\","
-                       "\"address\": \"" + ueAppAddress.str() + "\","
+                       "\"address\": \"" + ueAppAddress_.str() + "\","
                        "\"clientCorrelator\": \"null\","
                        "\"enteringLeavingCriteria\": \"Entering\","
                        "\"frequency\": 5,"
@@ -192,7 +192,7 @@ void MECWarningAlertApp::established(int connId)
         ack->setChunkLength(inet::B(2));
         inet::Packet *packet = new inet::Packet("WarningAlertPacketInfo");
         packet->insertAtBack(ack);
-        ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+        ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
         sendSubscription();
         return;
     }
@@ -272,7 +272,7 @@ void MECWarningAlertApp::handleServiceMessage(int connId)
 
                 inet::Packet *packet = new inet::Packet("WarningAlertPacketInfo");
                 packet->insertAtBack(alert);
-                ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+                ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
             }
         }
     }
@@ -360,7 +360,7 @@ void MECWarningAlertApp::handleSelfMessage(cMessage *msg)
             nack->setChunkLength(inet::B(2));
             inet::Packet *packet = new inet::Packet("WarningAlertPacketInfo");
             packet->insertAtBack(nack);
-            ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+            ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
         }
     }
 
@@ -371,7 +371,7 @@ void MECWarningAlertApp::handleProcessedMessage(cMessage *msg)
 {
     EV << "MECWarningAlertApp::handleProcessedMessage " << endl;
     if (!msg->isSelfMessage()) {
-        if (ueSocket.belongsToSocket(msg)) {
+        if (ueAppSocket_.belongsToSocket(msg)) {
             handleUeMessage(msg);
             delete msg;
             return;

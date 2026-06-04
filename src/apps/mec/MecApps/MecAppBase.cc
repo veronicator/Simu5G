@@ -426,12 +426,12 @@ void MecAppBase::established(int connId) {
         registrationBody["serviceConsumerId"]["appInstanceId"] = std::string(getName());
         registrationBody["serviceConsumerId"]["mepId"] = "";
         registrationBody["deviceInformation"] = nlohmann::json::array();
-        if(!ueAppAddress.isUnspecified() && ueAppPort > 0){
+        if(!ueAppAddress_.isUnspecified() && ueAppPort_ > 0){
             nlohmann::ordered_json deviceInformation;
             nlohmann::ordered_json associateId;
 
             associateId["type"] = "UE_IPv4_ADDRESS";
-            associateId["value"] = ueAppAddress.str();
+            associateId["value"] = ueAppAddress_.str();
             deviceInformation["associateId"] = associateId;
             deviceInformation["appMobilityServiceLevel"] = "APP_MOBILITY_NOT_ALLOWED";
             deviceInformation["contextTransferState"] = "NOT_TRANSFERRED";

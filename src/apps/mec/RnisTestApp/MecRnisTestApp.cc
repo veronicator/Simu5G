@@ -41,10 +41,10 @@ void MecRnisTestApp::initialize(int stage)
         return;
 
     // set Udp Socket
-    ueSocket.setOutputGate(gate("socketOut"));
+    ueAppSocket_.setOutputGate(gate("socketOut"));
 
-    localUePort = par("localUePort");
-    ueSocket.bind(localUePort);
+    localUePort_ = par("localUePort");
+    ueAppSocket_.bind(localUePort_);
 
     //testing
     EV << "MecRnisTestApp::initialize - Mec application " << getClassName() << " with mecAppId[" << mecAppId << "] has started!" << endl;
@@ -64,8 +64,8 @@ void MecRnisTestApp::handleUeMessage(cMessage *msg)
 {
     // determine its source address/port
     auto pk = check_and_cast<Packet *>(msg);
-    ueAppAddress = pk->getTag<L3AddressInd>()->getSrcAddress();
-    ueAppPort = pk->getTag<L4PortInd>()->getSrcPort();
+    ueAppAddress_ = pk->getTag<L3AddressInd>()->getSrcAddress();
+    ueAppPort_ = pk->getTag<L4PortInd>()->getSrcPort();
 
     auto mecPk = pk->peekAtFront<RnisTestAppPacket>();
 
@@ -108,7 +108,7 @@ void MecRnisTestApp::handleUeMessage(cMessage *msg)
         ack->setType(STOP_QUERY_RNIS_ACK);
         ack->setChunkLength(inet::B(2));
         packet->insertAtBack(ack);
-        ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+        ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
         EV << "MecRnisTestApp::handleUeMessage - an ACK has been sent to the UE" << endl;
 
         if (par("logger").boolValue()) {
@@ -183,12 +183,12 @@ void MecRnisTestApp::established(int connId)
         ack->setChunkLength(inet::B(2));
         inet::Packet *packet = new inet::Packet("RnisTestAppAckPacket");
         packet->insertAtBack(ack);
-        ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+        ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
 
         EV << "MecRnisTestApp::established - querying the RNIService" << endl;
 
         // send first request to the RNIS
-        sendQuery(0, ueAppAddress.toIpv4().str());
+        sendQuery(0, ueAppAddress_.toIpv4().str());
 
         // set periodic timer for next queries
         if (rnisQueryingPeriod_ > 0) {
@@ -251,7 +251,7 @@ void MecRnisTestApp::handleServiceMessage(int connId)
             rnisInfo->setL2meas(jsonBody);
             rnisInfo->setChunkLength(inet::B(jsonBody.dump(4).length()));
             packet->insertAtBack(rnisInfo);
-            ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+            ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
         }
     }
 }
@@ -280,14 +280,14 @@ void MecRnisTestApp::handleSelfMessage(cMessage *msg)
             nack->setType(START_QUERY_RNIS_NACK);
             nack->setChunkLength(inet::B(2));
             packet->insertAtBack(nack);
-            ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+            ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
         }
     }
     else if (strcmp(msg->getName(), "rnisQueryingTimer") == 0) {
         EV << "MecRnisTestApp::handleSelfMessage - rnisQueryingTimer expired: now querying the RNIService" << endl;
 
         // send request to the RNIS
-        sendQuery(0, ueAppAddress.toIpv4().str());
+        sendQuery(0, ueAppAddress_.toIpv4().str());
 
         scheduleAfter(rnisQueryingPeriod_, rnisQueryingTimer_);
         EV << "MecRnisTestApp::handleSelfMessage - next query to the RNIService in " << rnisQueryingPeriod_ << " seconds " << endl;
@@ -300,7 +300,7 @@ void MecRnisTestApp::handleSelfMessage(cMessage *msg)
 void MecRnisTestApp::handleProcessedMessage(cMessage *msg)
 {
     if (!msg->isSelfMessage()) {
-        if (ueSocket.belongsToSocket(msg)) {
+        if (ueAppSocket_.belongsToSocket(msg)) {
             handleUeMessage(msg);
             delete msg;
             return;

@@ -68,11 +68,12 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
   protected:
 
     //UDP socket to communicate with the UeApp
-    inet::UdpSocket ueSocket;
-    int localUePort;
+    inet::UdpSocket ueAppSocket_;
+    int localUePort_;
 
-    inet::L3Address ueAppAddress;
-    int ueAppPort;
+    // address+port of the UeApp
+    inet::L3Address ueAppAddress_;
+    int ueAppPort_;
 
     /* TCP sockets are dynamically created by the user according to her needs
      * the HttpBaseMessage* will be linked to the userData variable in TCPSocket class

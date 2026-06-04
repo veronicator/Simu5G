@@ -151,8 +151,8 @@ void MECResponseCbrApp::sendResponse()
     }
 
     inet::Packet *packet = check_and_cast<inet::Packet *>(currentRequestMsg_);
-    ueAppAddress = packet->getTag<L3AddressInd>()->getSrcAddress();
-    ueAppPort = packet->getTag<L4PortInd>()->getSrcPort();
+    ueAppAddress_ = packet->getTag<L3AddressInd>()->getSrcAddress();
+    ueAppPort_ = packet->getTag<L4PortInd>()->getSrcPort();
 
     auto req = packet->removeAtFront<RequestResponseAppPacket>();
     req->setType(MECAPP_RESPONSE);
@@ -163,7 +163,7 @@ void MECResponseCbrApp::sendResponse()
     inet::Packet *pkt = new inet::Packet("ResponseAppPacket");
     pkt->insertAtBack(req);
 
-    ueAppSocket_.sendTo(pkt, ueAppAddress, ueAppPort);
+    ueAppSocket_.sendTo(pkt, ueAppAddress_, ueAppPort_);
 
     //clean current request
     delete packet;
@@ -268,7 +268,7 @@ void MECResponseCbrApp::sendStopAck()
     req->setChunkLength(packetSize_);
     pkt->insertAtBack(req);
 
-    ueAppSocket_.sendTo(pkt, ueAppAddress, ueAppPort);
+    ueAppSocket_.sendTo(pkt, ueAppAddress_, ueAppPort_);
 }
 
 } //namespace

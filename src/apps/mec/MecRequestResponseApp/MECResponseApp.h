@@ -33,9 +33,6 @@ class MECResponseApp : public MecAppBase
 {
   protected:
 
-    inet::UdpSocket ueAppSocket_;
-    int localUePort_;
-
     cMessage *currentRequestfMsg_ = nullptr;
     cMessage *processingTimer_ = nullptr;
     simtime_t msgArrived_;
@@ -47,10 +44,6 @@ class MECResponseApp : public MecAppBase
 
     int minInstructions_;
     int maxInstructions_;
-
-    // address+port of the UeApp
-    inet::L3Address ueAppAddress;
-    int ueAppPort;
 
 
     int numInitStages() const override { return inet::NUM_INIT_STAGES; }

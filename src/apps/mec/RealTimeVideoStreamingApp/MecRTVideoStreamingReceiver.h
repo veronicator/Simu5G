@@ -44,13 +44,6 @@ class MecRTVideoStreamingReceiver : public MecAppBase
     bool stopped;
     int fps;
 
-    //UDP socket to communicate with the UeApp
-    inet::UdpSocket ueSocket;
-    int localUePort;
-
-    inet::L3Address ueAppAddress;
-    int ueAppPort;
-
     int size_;
 
     int currentSessionId_ = -1;

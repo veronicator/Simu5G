@@ -60,10 +60,10 @@ void MecRTVideoStreamingReceiver::initialize(int stage)
     size_ = par("packetSize");
 
     // set Udp Socket
-    ueSocket.setOutputGate(gate("socketOut"));
+    ueAppSocket_.setOutputGate(gate("socketOut"));
 
-    localUePort = par("localUePort");
-    ueSocket.bind(localUePort);
+    localUePort_ = par("localUePort");
+    ueAppSocket_.bind(localUePort_);
 
     // testing
     EV << "MecRTVideoStreamingReceiver::initialize - Mec application " << getClassName() << " with mecAppId[" << mecAppId << "] has started!" << endl;
@@ -87,7 +87,7 @@ void MecRTVideoStreamingReceiver::finish() {
 void MecRTVideoStreamingReceiver::handleMessage(cMessage *msg)
 {
     if (!msg->isSelfMessage()) {
-        if (ueSocket.belongsToSocket(msg)) {
+        if (ueAppSocket_.belongsToSocket(msg)) {
             handleUeMessage(msg);
             return;
         }
@@ -99,12 +99,12 @@ void MecRTVideoStreamingReceiver::handleUeMessage(cMessage *msg)
 {
     // determine its source address/port
     auto pk = check_and_cast<Packet *>(msg);
-    ueAppAddress = pk->getTag<L3AddressInd>()->getSrcAddress();
-    ueAppPort = pk->getTag<L4PortInd>()->getSrcPort();
+    ueAppAddress_ = pk->getTag<L3AddressInd>()->getSrcAddress();
+    ueAppPort_ = pk->getTag<L4PortInd>()->getSrcPort();
 
     // register statistics: they will be recorded at the UE side
     if (ueAppModule_ == nullptr) {
-        ueAppModule_ = L3AddressResolver().findHostWithAddress(ueAppAddress)->getSubmodule("app", 1);
+        ueAppModule_ = L3AddressResolver().findHostWithAddress(ueAppAddress_)->getSubmodule("app", 1);
     }
 
     auto mecPk = pk->peekAtFront<RealTimeVideoStreamingAppPacket>();
@@ -140,7 +140,7 @@ void MecRTVideoStreamingReceiver::handleSelfMessage(cMessage *msg)
 
 void MecRTVideoStreamingReceiver::handleStartMessage(cMessage *msg)
 {
-    EV << "MecRTVideoStreamingReceiver::handleStartMessage - START_RTVIDEOSTREAMING msg arrived from: " << ueAppAddress.str() << endl;
+    EV << "MecRTVideoStreamingReceiver::handleStartMessage - START_RTVIDEOSTREAMING msg arrived from: " << ueAppAddress_.str() << endl;
     auto pk = check_and_cast<Packet *>(msg);
     auto startPkt = pk->removeAtFront<StartRealTimeVideoStreamingAppPacket>();
 
@@ -153,7 +153,7 @@ void MecRTVideoStreamingReceiver::handleStartMessage(cMessage *msg)
 
     inet::Packet *packet = new inet::Packet("RealTimeVideoStreamingAppPacket");
     packet->insertAtBack(startPkt);
-    ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+    ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
 }
 
 void MecRTVideoStreamingReceiver::handleStopMessage(cMessage *msg)
@@ -176,7 +176,7 @@ void MecRTVideoStreamingReceiver::handleStopMessage(cMessage *msg)
 
     inet::Packet *packet = new inet::Packet("RealTimeVideoStreamingAppPacket");
     packet->insertAtBack(stoptPkt);
-    ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+    ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
 }
 
 void MecRTVideoStreamingReceiver::handleSessionStartMessage(cMessage *msg)
@@ -204,7 +204,7 @@ void MecRTVideoStreamingReceiver::handleSessionStartMessage(cMessage *msg)
 
     inet::Packet *packet = new inet::Packet("RealTimeVideoStreamingAppPacket");
     packet->insertAtBack(startPkt);
-    ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+    ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
 }
 
 void MecRTVideoStreamingReceiver::handleSessionStopMessage(cMessage *msg)
@@ -236,7 +236,7 @@ void MecRTVideoStreamingReceiver::handleSessionStopMessage(cMessage *msg)
 
     inet::Packet *packet = new inet::Packet("RealTimeVideoStreamingAppPacket");
     packet->insertAtBack(stoptPkt);
-    ueSocket.sendTo(packet, ueAppAddress, ueAppPort);
+    ueAppSocket_.sendTo(packet, ueAppAddress_, ueAppPort_);
 }
 
 double MecRTVideoStreamingReceiver::playoutFrame()
