@@ -19,6 +19,7 @@
 #include <omnetpp.h>
 #include <string>
 #include "nodes/mec/MECPlatform/MECServices/MECServiceBase/MecServiceBase2.h"
+#include "nodes/mec/MECPlatformManager/MecPlatformManager.h"
 
 // Resources needed by the service
 #include "resources/ApplicationMobilityResource.h"
@@ -26,6 +27,7 @@
 #include "resources/MobilityProcedureNotification.h"
 #include "resources/FilterCriteria.h"
 #include "nodes/mec/MECPlatform/MECServices/Resources/NotificationBase.h"
+#include "nodes/mec/MECPlatform/ServiceRegistry/resources/ServiceInfo.h"
 
 
 namespace simu5g {
@@ -59,6 +61,9 @@ class ApplicationMobilityService : public MecServiceBase2
 
   int migrationCounter_;
   simsignal_t totalMigrationsSignal_;
+
+//  // socket to communicate with RNIS
+  inet::TcpSocket *rnisSocket_ = nullptr;
 
   public:
     ApplicationMobilityService();

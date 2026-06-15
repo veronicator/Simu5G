@@ -47,66 +47,100 @@ void ApplicationMobilityService::initialize(int stage)
     EV << "AMS::Initializing..." << endl;
     migrationCounter_ = 0;
     totalMigrationsSignal_ = registerSignal("totalMigrations");
+
     MecServiceBase2::initialize(stage);
+
+    if (stage == inet::INITSTAGE_APPLICATION_LAYER) {
+        // connect with the RNIS
+        cMessage *m = new cMessage("connectRNIS");
+        scheduleAt(simTime() + 0.3, m);
+    }
 }
 
 void ApplicationMobilityService::handleMessage(cMessage *msg)
 {
-    if(msg->isSelfMessage() && std::strcmp(msg->getFullName(),"localMigration") == 0)
-    {
-        EV << "AMS::LOCAL MIGRATION RECEIVED: to be processed " << registrationResources_->getMigratedApps().size() << endl;
-        if(registrationResources_->getMigratedApps().size() > 0)
-        {
-            EV << "AMS::an app has been correctly migrated -- generate local event" << endl;
-            for(auto &el : registrationResources_->getMigratedApps())
-            {
-                // Generating notification
-                MobilityProcedureNotification *notification = new MobilityProcedureNotification();
-                RegistrationInfo *r = registrationResources_->getRegistrationInfoFromContext(el.second->getAppInstanceId());
-                if(r != nullptr)
-                {
-                    notification->setMobilityStatus(INTERHOST_MOVEOUT_COMPLETED);
-                    notification->setTargetAppInfo(*el.second);
+    if(msg->isSelfMessage()) {
+        if (std::strcmp(msg->getFullName(),"localMigration") == 0) {
+            EV << "AMS::LOCAL MIGRATION RECEIVED: to be processed " << registrationResources_->getMigratedApps().size() << endl;
+            if(registrationResources_->getMigratedApps().size() > 0) {
+                EV << "AMS::an app has been correctly migrated -- generate local event" << endl;
+                for(auto &el : registrationResources_->getMigratedApps()) {
+                    // Generating notification
+                    MobilityProcedureNotification *notification = new MobilityProcedureNotification();
+                    RegistrationInfo *r = registrationResources_->getRegistrationInfoFromContext(el.second->getAppInstanceId());
+                    if(r != nullptr) {
+                        notification->setMobilityStatus(INTERHOST_MOVEOUT_COMPLETED);
+                        notification->setTargetAppInfo(*el.second);
 
-                    // statistics
-                    simtime_t migrationUpdateTime = simTime();
-                    // total migration from the start
-                    migrationCounter_ ++;
-                    std::cout << "Migration counter has been updated: " << migrationCounter_ << endl;
+                        // statistics
+                        simtime_t migrationUpdateTime = simTime();
+                        // total migration from the start
+                        migrationCounter_ ++;
+                        std::cout << "Migration counter has been updated: " << migrationCounter_ << endl;
 
-                    // migration at this time (useful to set grop migration per an interval of time)
-                    // value = 1 is just an indication
-                    emit(totalMigrationsSignal_, 1);
+                        // migration at this time (useful to set grop migration per an interval of time)
+                        // value = 1 is just an indication
+                        emit(totalMigrationsSignal_, 1);
 
 
-                    std::vector<AssociateId> associateId;
-                    for(auto devInfo : r->getDeviceInformation())
-                    {
-                        associateId.push_back(devInfo.getAssociateId());
-                        EV << "AMS::local notification generated - associateID " << devInfo.getAssociateId().getValue() << " added" << endl;
+                        std::vector<AssociateId> associateId;
+                        for(auto devInfo : r->getDeviceInformation()) {
+                            associateId.push_back(devInfo.getAssociateId());
+                            EV << "AMS::local notification generated - associateID " << devInfo.getAssociateId().getValue() << " added" << endl;
+                        }
+                        notification->setAssociateId(associateId);
+
+                        // removing migrated app from the list
+                        registrationResources_->removingMigratedApp(el.first);
+
+
+                        nlohmann::ordered_json jsonObject = notification->toJson();
+                        EV << "AMS::local notification generated " << jsonObject.dump(2) << endl;
+                        handleNotificationCallback(jsonObject);
                     }
-                    notification->setAssociateId(associateId);
+                    else {
+                        EV << "AMS:: no information regarding migrated app - " << el.second->getAppInstanceId() << " - has been found" << endl;
+                    }
+                }
+            }
+            delete msg;
+        }
+        else if (strcmp(msg->getName(), "connectRNIS") == 0) {
+            EV << "ApplicationMobilityService::handleMessage " << msg->getName() << endl;
+            if (mecPlatformManager_ != nullptr) {
+                auto mecServices = mecPlatformManager_->getAvailableMecServices();
+                nlohmann::json rnisInfo;
+                for (const auto& service : *mecServices) {
+                    EV << "ApplicationMobilityService::connectRNIS - mec serv: " << service.getName() << endl;
+                    if (service.getName() == "RNIService") {
+                        rnisInfo = service.toJson();
+//                        tmpRnis = service.ServiceInfo();
+                        if (service.getMecHost() == meHost_->getName())
+                            break;
+                    }
+                }
+                if (!rnisInfo.empty()) {
+                    rnisSocket_ = new TcpSocket();
+                    rnisSocket_->setOutputGate(gate("socketOut"));
+                    rnisSocket_->setCallback(this);
+                    socketMap.addSocket(rnisSocket_);
 
-                    // removing migrated app from the list
-                    registrationResources_->removingMigratedApp(el.first);
-
-
-                    nlohmann::ordered_json jsonObject = notification->toJson();
-                    EV << "AMS::local notification generated " << jsonObject.dump(2) << endl;
-                    handleNotificationCallback(jsonObject);
+                    std::string address = rnisInfo["transportInfo"]["endPoint"]["addresses"]["host"];
+                    inet::L3Address rnisAddr = L3AddressResolver().resolve(address.c_str());
+                    EV << "ApplicationMobilityService::connectRNIS - rnisInfo addr: " << address << " port: " << rnisInfo["transportInfo"]["endPoint"]["addresses"]["port"] << endl;
+                    rnisSocket_->connect(rnisAddr, rnisInfo["transportInfo"]["endPoint"]["addresses"]["port"]);
 
                 }
-                else
-                {
-                    EV << "AMS:: no information regarding migrated app - " << el.second->getAppInstanceId() << " - has been found" << endl;
+                else {
+                    EV << "ApplicationMobilityService::connectRNIS - RNIService not found" << endl;
 
                 }
             }
+            else
+                EV << "ApplicationMobilityService::handleMessage - mecPlatformManager_ is null " << endl;
         }
-        delete msg;
     }
-    else
-        MecServiceBase::handleMessage(msg);
+    MecServiceBase::handleMessage(msg);
 }
 
 void ApplicationMobilityService::handleGETRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket)
@@ -174,8 +208,7 @@ void ApplicationMobilityService::handleGETRequest(const HttpRequestMessage *curr
         }
 
     }
-    else
-    {
+    else {
         EV << "AMS::Bad Request" << endl;
         Http::send400Response(socket);
     }
