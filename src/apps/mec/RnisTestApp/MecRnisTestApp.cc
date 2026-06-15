@@ -302,9 +302,9 @@ void MecRnisTestApp::handleProcessedMessage(cMessage *msg)
 {
     if (!msg->isSelfMessage()) {
         if (ueAppSocket_.belongsToSocket(msg)) {
-            handleUeMessage(msg);
-            delete msg;
-            return;
+            handleUeMessage(msg);   // todo: aggiungere ->dup() ?
+//            delete msg;
+//            return;
         }
     }
     MecAppBase::handleProcessedMessage(msg);

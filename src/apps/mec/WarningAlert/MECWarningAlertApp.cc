@@ -71,6 +71,7 @@ void MECWarningAlertApp::finish() {
 
 void MECWarningAlertApp::handleUeMessage(cMessage *msg)
 {
+    EV << "MECWarningAlertApp::handleUeMessage" << endl;
     // determine its source address/port
     auto pk = check_and_cast<Packet *>(msg);
     ueAppAddress_ = pk->getTag<L3AddressInd>()->getSrcAddress();
@@ -373,8 +374,8 @@ void MECWarningAlertApp::handleProcessedMessage(cMessage *msg)
     if (!msg->isSelfMessage()) {
         if (ueAppSocket_.belongsToSocket(msg)) {
             handleUeMessage(msg);
-            delete msg;
-            return;
+//            delete msg;
+//            return;
         }
     }
     MecAppBase::handleProcessedMessage(msg);

@@ -85,7 +85,8 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     MecServiceSocketInfo* mecServices[4] = {nullptr, nullptr, nullptr, nullptr};
     std::string requiredSerName_;
 
-    bool mobilityAware;
+    bool mobilityAware_;
+    bool amsRegistration_;
 
     cQueue packetQueue_;
     cMessage *currentProcessedMsg_ = nullptr;
@@ -154,6 +155,9 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
 
     // method to handle REQ/RES messages from Application Mobility Service
     void handleAmsMessage(int connId);
+
+    // method to register the MEC app to AMS
+    void sendAmsRegistration(cMessage *msg);
 
     virtual double scheduleNextMsg(cMessage *msg);
 

@@ -63,18 +63,20 @@ void MECResponseCbrApp::initialize(int stage)
 
 void MECResponseCbrApp::handleProcessedMessage(cMessage *msg)
 {
+    EV << "MECResponseCbrApp::handleProcessedMessage" << endl;
     if (!msg->isSelfMessage()) {
         if (ueAppSocket_.belongsToSocket(msg)) {
             EV << "MECResponseCbrApp::handleProcessedMessage: received message from UE" << endl;
-            inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
+            auto msgDup = msg->dup();
+            inet::Packet *packet = check_and_cast<inet::Packet *>(msgDup);
             auto req = packet->peekAtFront<RequestResponseAppPacket>();
             if (req->getType() == UEAPP_REQUEST)
-                handleRequest(msg);
+                handleRequest(msgDup);
             else if (req->getType() == UEAPP_STOP)
-                handleStopRequest(msg);
+                handleStopRequest(msgDup);
             else
                 throw cRuntimeError("MECResponseCbrApp::handleProcessedMessage - Type not recognized!");
-            return;
+//            return;
         }
     }
     MecAppBase::handleProcessedMessage(msg);

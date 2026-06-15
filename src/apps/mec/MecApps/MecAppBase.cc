@@ -14,6 +14,8 @@
 #include <inet/common/ProtocolTag_m.h>
 #include <inet/common/ProtocolGroup.h>
 #include <inet/common/Protocol.h>
+#include <inet/networklayer/common/L3AddressTag_m.h>
+#include <inet/transportlayer/common/L4PortTag_m.h>
 
 #include "apps/mec/MecApps/packets/ProcessingTimeMessage_m.h"
 #include "nodes/mec/utils/MecCommon.h"
@@ -58,12 +60,13 @@ void MecAppBase::initialize(int stage)
     mp1Socket_ = addNewSocket();
 
 
-    mobilityAware = par("mobilityAware").boolValue();
+    mobilityAware_ = par("mobilityAware").boolValue();
 
-    if (mobilityAware) {
+    if (mobilityAware_) {
         mecServices[AMS] = new MecServiceSocketInfo;
         mecServices[AMS]->serviceSocket_ = addNewSocket();
     }
+    amsRegistration_ = false;
 
     // connect with the service registry
     cMessage *msg = new cMessage("connectMp1");
@@ -395,12 +398,54 @@ void MecAppBase::handleAmsMessage(int connId) {
     }
 }
 
+void MecAppBase::sendAmsRegistration(cMessage *msg)
+{
+    EV << "MecAppBase::sendAmsRegistration"<< endl;
+
+    // determine its source address/port
+    auto pk = check_and_cast<Packet *>(msg);
+    ueAppAddress_ = pk->getTag<L3AddressInd>()->getSrcAddress();
+//    ueAppPort_ = pk->getTag<L4PortInd>()->getSrcPort();
+
+    // Send registration
+    // todo for HMS add a new field (isMobile/mobileMecHost) in the registration request
+
+    nlohmann::ordered_json registrationBody;
+    registrationBody = nlohmann::ordered_json();
+    registrationBody["serviceConsumerId"]["appInstanceId"] = std::string(getName());
+    registrationBody["serviceConsumerId"]["mepId"] = "";
+    registrationBody["deviceInformation"] = nlohmann::json::array();
+
+//    if(!ueAppAddress_.isUnspecified() && ueAppPort_ > 0){
+//        EV << "MecAppBase::sendAmsRegistration - ueAppAddress"<< endl;
+        nlohmann::ordered_json deviceInformation;
+        nlohmann::ordered_json associateId;
+
+        associateId["type"] = "UE_IPv4_ADDRESS";
+        associateId["value"] = ueAppAddress_.str();
+
+        deviceInformation["associateId"] = associateId;
+        deviceInformation["appMobilityServiceLevel"] = "APP_MOBILITY_NOT_ALLOWED";
+        deviceInformation["contextTransferState"] = "NOT_TRANSFERRED";
+
+        registrationBody["deviceInformation"].push_back(deviceInformation);
+//    }
+
+    EV << "Registration with body" << registrationBody.dump().c_str() << endl;
+    std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());
+    const char *uri = "/example/amsi/v1/app_mobility_services";
+    EV << "AMS Registration host " << host << endl;
+    Http::sendPostRequest(mecServices[AMS]->serviceSocket_, registrationBody.dump().c_str(), host.c_str(), uri);
+    responsecounter++;
+    amsRegistration_ = true;
+}
+
 void MecAppBase::established(int connId) {
     if (mp1Socket_ != nullptr && connId == mp1Socket_->getSocketId()) {
         EV << "MECAppBase::established - Mp1Socket" << endl;
         // get endPoint of the required service
         std::string uri;
-        if (mobilityAware)
+        if (mobilityAware_)
             uri = "/example/mec_service_mgmt/v1/services?ser_name=ApplicationMobilityService," + requiredSerName_;
         else
             uri = "/example/mec_service_mgmt/v1/services?ser_name=" + requiredSerName_;
@@ -414,35 +459,7 @@ void MecAppBase::established(int connId) {
     }
     else if(mecServices[AMS] != nullptr && connId == mecServices[AMS]->serviceSocket_->getSocketId()) {
         EV << "MecAppBase::established - AMSSocket"<< endl;
-
-        // Send registration
-        // todo for HMS add a new field (isMobile/mobileMecHost) in the registration request
-
-        nlohmann::ordered_json registrationBody;
-        registrationBody = nlohmann::ordered_json();
-        registrationBody["serviceConsumerId"]["appInstanceId"] = std::string(getName());
-        registrationBody["serviceConsumerId"]["mepId"] = "";
-        registrationBody["deviceInformation"] = nlohmann::json::array();
-        if(!ueAppAddress_.isUnspecified() && ueAppPort_ > 0){
-            nlohmann::ordered_json deviceInformation;
-            nlohmann::ordered_json associateId;
-
-            associateId["type"] = "UE_IPv4_ADDRESS";
-            associateId["value"] = ueAppAddress_.str();
-            deviceInformation["associateId"] = associateId;
-            deviceInformation["appMobilityServiceLevel"] = "APP_MOBILITY_NOT_ALLOWED";
-            deviceInformation["contextTransferState"] = "NOT_TRANSFERRED";
-
-            registrationBody["deviceInformation"].push_back(deviceInformation);
-        }
-
-        EV << "Registration with body" << registrationBody.dump().c_str() << endl;
-        std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());
-        const char *uri = "/example/amsi/v1/app_mobility_services/";
-        Http::sendPostRequest(mecServices[AMS]->serviceSocket_, registrationBody.dump().c_str(), host.c_str(), uri);
-        responsecounter++;
-
-        return;
+        // the registration to AMS will be done after first message received directly from UeApp
     }
     else {
         EV << "MecAppBase::established - Socket " << connId << " not recognized" << endl;
@@ -460,6 +477,10 @@ void MecAppBase::handleProcessedMessage(cMessage *msg)
 {
     if (msg->isSelfMessage()) {
         handleSelfMessage(msg);
+    }
+    else if (mobilityAware_ && ueAppSocket_.belongsToSocket(msg) && !amsRegistration_) {
+        EV << "MecAppBase::handleProcessedMessage(): message from UeAppSocket - register UE to ams" << endl;
+        sendAmsRegistration(msg);
     }
     else {
         ISocket *sock = sockets_.findSocketFor(msg);
