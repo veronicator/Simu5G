@@ -39,7 +39,7 @@ simple UALCMPApp like IApp
         int localPort = default(1000);     // localPort number to listen on
 
         // hostname of the reference orchestrator
-        string mecOrchestratorHostname;
+        string mecOrchestratorHostname = default("mecOrchestrator.mecOrchestratorApp");
 
         double requestServiceTime @unit(s) = default(5us);
         double subscriptionServiceTime @unit(s) = default(10us);
