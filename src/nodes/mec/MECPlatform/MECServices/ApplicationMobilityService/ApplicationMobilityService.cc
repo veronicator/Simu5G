@@ -14,6 +14,7 @@
 // 
 
 #include "nodes/mec/MECPlatform/MECServices/ApplicationMobilityService/ApplicationMobilityService.h"
+#include "nodes/mec/MECPlatform/MECServices/RNIService/resources/FilterCriteriaAssocHo.h"
 
 namespace simu5g {
 
@@ -24,7 +25,7 @@ ApplicationMobilityService::ApplicationMobilityService()
 {
     registrationResources_ = new ApplicationMobilityResource();
     baseUriQueries_ = "/example/amsi/v1/queries/";
-    baseUriSerDer_ = "/example/amsi/v1/app_mobility_services/"; // registration and deregistration uri
+    baseUriSerDer_ = "/example/amsi/v1/app_mobility_services"; // registration and deregistration uri
     callbackUri_ = "/example/amsi/v1/eventNotification/";
     baseUriSubscriptions_ = "/example/amsi/v1/subscriptions/";
     baseSubscriptionLocation_ = host_+ baseUriSubscriptions_;
@@ -214,18 +215,15 @@ void ApplicationMobilityService::handleGETRequest(const HttpRequestMessage *curr
     }
 }
 
-void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket)
-{
+void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket) {
     EV << "AMS::handlePOSTRequest" << endl;
     std::string uri = currentRequestMessageServed->getUri();
-    if(uri.compare(baseUriSerDer_) == 0)
-    {
+    if(uri.compare(baseUriSerDer_) == 0) {
 
         nlohmann::ordered_json request = nlohmann::json::parse(currentRequestMessageServed->getBody());
         RegistrationInfo* r = new RegistrationInfo();//registrationResources_->buildRegistrationInfoFromJson(request);
         bool res = r->fromJson(request);
-        if(!res)
-        {
+        if(!res) {
             EV << "AMS::Post request - bad request " << endl;
             Http::send400Response(socket);
             return;
@@ -239,23 +237,44 @@ void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *cur
         std::pair<std::string, std::string> p("Location: ", baseUriSerDer_);
         EV << "AMS::Correctly subscribed sending: " << response.dump() <<endl;
         Http::send201Response(socket, response.dump(2).c_str(), p);
+
+        if (rnisSocket_ != nullptr) {
+            //todo: send RNIS CellChangeSubscription
+            std::string uristring = "/example/rni/v2/subscriptions";
+            std::string host = rnisSocket_->getRemoteAddress().str()+":"+std::to_string(rnisSocket_->getRemotePort());
+
+            nlohmann::ordered_json subscriptionBody_;
+            subscriptionBody_ = nlohmann::ordered_json();
+            subscriptionBody_["subscriptionType"] = "CellChangeSubscription";
+            inet::L3Address localAddress = inet::L3AddressResolver().resolve(getParentModule()->getParentModule()->getFullPath().c_str());
+            EV << "ApplicationMobilityService::handlePOSTRequest - send RNIS CellChangeSubscription - localAddress: " << localAddress << endl;
+            subscriptionBody_["callbackReference"] = localAddress.str() + ":" + std::to_string(par("localPort").intValue()) + callbackUri_;
+            EV << "ApplicationMobilityService::handlePOSTRequest - send RNIS CellChangeSubscription - callbackReference: " << subscriptionBody_["callbackReference"] << endl;
+            // subscriptionBody_["websockNotifConfig"] =
+            subscriptionBody_["filterCriteriaAssocHo"]["appInstanceId"] = getName();
+            subscriptionBody_["filterCriteriaAssocHo"]["associateId"] = nlohmann::ordered_json::array();
+
+            subscriptionBody_["filterCriteriaAssocHo"]["associateId"].push_back(r->getDeviceInformation()[0].getAssociateId().toJson());   //.push_back(ueId.toJson());
+            subscriptionBody_["filterCriteriaAssocHo"]["hoStatus"] = nlohmann::ordered_json::array();
+            subscriptionBody_["filterCriteriaAssocHo"]["hoStatus"].push_back(hoStatusString[IN_PREPARATION]);
+            // subscriptionBody_["filterCriteriaAssocHo"]["ecgi"] = nlohmann::ordered_json::array();
+            subscriptionBody_["requestTestNotification"] = false;
+
+            Http::sendPostRequest(rnisSocket_, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
+        }
     }
-    else if(uri.compare(baseUriSubscriptions_) == 0)
-    {
+    else if(uri.compare(baseUriSubscriptions_) == 0) {
         // New subscriber
         nlohmann::ordered_json request = nlohmann::json::parse(currentRequestMessageServed->getBody());
-        if(request.contains("subscriptionType"))
-        {
+        if(request.contains("subscriptionType")) {
             SubscriptionBase *subscription = nullptr;
 
-            if(request["subscriptionType"] == "MobilityProcedureSubscription")
-            {
+            if(request["subscriptionType"] == "MobilityProcedureSubscription") {
                 subscription = new MobilityProcedureSubscription(subscriptionId_, socket, baseSubscriptionLocation_, eNodeB_);
             }
             // Here should be added AdjacentAppInfoSubscription
 
-            if(subscription == nullptr)
-            {
+            if(subscription == nullptr) {
                 EV << "AMS::Subscription type not recognized" << endl;
                 Http::send400Response(socket);
             }

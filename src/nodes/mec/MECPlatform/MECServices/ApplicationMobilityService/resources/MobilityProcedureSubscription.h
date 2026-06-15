@@ -20,7 +20,7 @@ namespace simu5g {
 using namespace omnetpp;
 
 
-class MobilityProcedureSubscription : public SubscriptionBase{
+class MobilityProcedureSubscription : public SubscriptionBase {
   private:
     //const std::string subscriptionType = "MobilityProcedureSubscription"; //optional: no (Shall be set to "MobilityProcedureSubscription")
     /*

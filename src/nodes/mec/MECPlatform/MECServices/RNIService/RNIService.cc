@@ -134,7 +134,9 @@ void RNIService::handleGETRequest(const HttpRequestMessage *currentRequestMessag
     }
 }
 
-void RNIService::handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) {}
+void RNIService::handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) {
+    // todo
+}
 
 void RNIService::handlePUTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) {}
 

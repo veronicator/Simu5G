@@ -70,23 +70,24 @@ class ApplicationMobilityService : public MecServiceBase2
     ~ApplicationMobilityService();
 
   protected:
-    virtual void initialize(int stage) override;
-    virtual void finish() override;
-    virtual void handleMessage(cMessage *msg) override;
+    void initialize(int stage) override;
+    void finish() override;
+    void handleMessage(cMessage *msg) override;
 
-    virtual void handleGETRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket) override;
-    virtual void handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket)   override;
-    virtual void handlePUTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket)    override;
-    virtual void handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket) override;
+    void handleGETRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket) override;
+    void handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket)   override;
+    void handlePUTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket)    override;
+    void handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket) override;
 
     void handleSubscriptionRequest(SubscriptionBase *subscription, inet::TcpSocket* socket, const nlohmann::ordered_json& request);
     void handleNotificationCallback(const nlohmann::ordered_json& request);
 
+    void sendCellChangeSubscription();
 
     /*
      * This method is called for every element in the subscriptions_ queue.
      */
-    virtual bool manageSubscription() override;
+    bool manageSubscription() override;
   private:
     virtual void printAllSubscriptions();
 };
