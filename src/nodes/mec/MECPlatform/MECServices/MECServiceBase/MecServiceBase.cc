@@ -265,7 +265,7 @@ void MecServiceBase::scheduleNextEvent(bool now)
         }
 
         if (now)
-            scheduleAt(simTime() + 0, subscriptionService_);
+            scheduleAt(simTime() + 0, requestService_);
         else {
             //calculate the serviceTime based on the type | parameters
             double serviceTime = calculateRequestServiceTime(); //must be >0
@@ -295,7 +295,7 @@ void MecServiceBase::handleRequestQueueFull(HttpRequestMessage *msg)
 
 void MecServiceBase::newRequest(HttpRequestMessage *msg)
 {
-    EV << "Queue length: " << requests_.getLength() << endl;
+    EV << "MecServiceBase::newRequest Queue length: " << requests_.getLength() << endl;
     // If queue is full respond 503 queue full
     if (requestQueueSize_ != 0 && requests_.getLength() == requestQueueSize_) {
         EV << "MecServiceBase::newRequest - queue is full" << endl;
