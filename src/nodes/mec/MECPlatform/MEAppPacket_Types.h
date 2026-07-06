@@ -14,7 +14,7 @@
 
 #define START_MEAPP         "MEAppStart"
 #define STOP_MEAPP          "MEAppStop"
-#define MIGRATE_MEAPP_REQ   "MEAppMigrateReq"
+#define MIGRATE_MEAPPS_REQ   "MEAppMigrateReq"
 #define MIGRATE_MEAPP       "MEAppMigrate"
 #define STOP_MIGRATED_MEAPP "MigratedMEAppStop"
 

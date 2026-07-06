@@ -35,5 +35,20 @@ cModule *MecHostSelectionBased::findBestMecHost(const ApplicationDescriptor& app
     return bestHost;
 }
 
+cModule *MecHostSelectionBased::findBestTargetMecHost(const ApplicationDescriptor& appDesc, std::vector<cModule *> eligibleTargetMecHosts) {
+    EV << "MecHostSelectionBased::findBestTargetMecHost - finding best MecHost..." << endl;
+    cModule *bestHost = nullptr;
+
+    int size = eligibleTargetMecHosts.size();
+    if (size <= mecHostIndex_) {
+        EV << "MecHostSelectionBased::findBestTargetMecHost - No Mec Host with index [" << mecHostIndex_ << "] found" << endl;
+    }
+    else {
+        bestHost = eligibleTargetMecHosts.at(mecHostIndex_);
+        EV << "MecHostSelectionBased::findBestTargetMecHost - MEC host [" << bestHost->getName() << "] has been chosen as the best Mec Host" << endl;
+    }
+    return bestHost;
+}
+
 } //namespace
 

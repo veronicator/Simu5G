@@ -44,7 +44,49 @@ nlohmann::ordered_json FilterCriteriaAssocHo::toJson() const
 
 bool FilterCriteriaAssocHo::fromJson(const nlohmann::ordered_json& json)
 {
-    EV << "FilterCriteriaAssocHo::Building FilterCriteriaAssocHo attribute from json" << endl;
+    EV << "FilterCriteriaAssocHo::Building FilterCriteriaAssocHo attribute from json - " << json << endl;
+
+    appInstanceId_ = json["appInstanceId"];
+    for(auto &val : json["associateId"].items()){
+        nlohmann::ordered_json associateId = val.value();
+        AssociateId a;
+        a.setType(associateId["type"]);
+        a.setValue(associateId["value"]);
+//        associateId_.push_back(a);
+    }
+
+    if(!json.contains("hoStatus"))
+    {
+       hoStatus_.push_back(getHoStatusFromString("COMPLETED")); // default value
+    }
+    else
+    {
+        for(auto &val : json["hoStatus"].items()){
+           nlohmann::ordered_json hoStatusString = val.value();
+           hoStatus_.push_back(getHoStatusFromString(hoStatusString));
+        }
+    }
+
+    if(json.contains("ecgi"))
+    {
+        for(auto &val : json["ecgi"].items()){
+           nlohmann::ordered_json ecgi = val.value();
+           Ecgi e;
+           e.setCellId(ecgi["cellId"]);
+           mec::Plmn plmn;
+           plmn.mcc = ecgi["plmn"]["mcc"];
+           plmn.mnc = ecgi["plmn"]["mnc"];
+           e.setPlmn(plmn);
+           ecgi_.push_back(e);
+        }
+    }
+
+    return true;
+}
+
+void FilterCriteriaAssocHo::setFilterCriteriaValueFromJson(const nlohmann::ordered_json& json)
+{
+    EV << "FilterCriteriaAssocHo::Building FilterCriteriaAssocHo attribute from json - " << json << endl;
 
     appInstanceId_ = json["appInstanceId"];
     for(auto &val : json["associateId"].items()){
@@ -74,14 +116,12 @@ bool FilterCriteriaAssocHo::fromJson(const nlohmann::ordered_json& json)
            Ecgi e;
            e.setCellId(ecgi["cellId"]);
            mec::Plmn plmn;
-           plmn.mcc = ecgi["plmnId"]["mcc"];
-           plmn.mnc = ecgi["plmnId"]["mnc"];
+           plmn.mcc = ecgi["plmn"]["mcc"];
+           plmn.mnc = ecgi["plmn"]["mnc"];
            e.setPlmn(plmn);
            ecgi_.push_back(e);
         }
     }
-
-    return true;
 }
 
 

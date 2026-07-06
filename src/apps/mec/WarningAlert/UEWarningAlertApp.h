@@ -95,6 +95,7 @@ class UEWarningAlertApp : public cSimpleModule
     void handleAckStartMEWarningAlertApp(cMessage *msg);
     void handleInfoMEWarningAlertApp(cMessage *msg);
     void handleAckStopMEWarningAlertApp(cMessage *msg);
+    void handleMigrateMecApp(cMessage *msg);
 };
 
 } //namespace

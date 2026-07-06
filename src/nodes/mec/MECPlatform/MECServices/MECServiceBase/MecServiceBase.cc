@@ -143,6 +143,7 @@ void MecServiceBase::handleCrashOperation(inet::LifecycleOperation *operation)
 
 void MecServiceBase::handleMessageWhenUp(cMessage *msg)
 {
+    EV << " MecServiceBase::handleMessageWhenUp - " << msg->getName() << endl;
     if (msg->isSelfMessage()) {
         EV << " MecServiceBase::handleMessageWhenUp - " << msg->getName() << endl;
         if (msg == subscriptionService_) {
@@ -345,7 +346,7 @@ void MecServiceBase::newRequest(HttpRequestMessage *msg)
 
 void MecServiceBase::newSubscriptionEvent(EventNotification *event)
 {
-    EV << "Queue length: " << subscriptionEvents_.size() << endl;
+    EV << "MecServiceBase::newSubscriptionEvent Queue length: " << subscriptionEvents_.size() << endl;
     // If queue is full delete event
     if (subscriptionQueueSize_ != 0 && subscriptionEvents_.size() == subscriptionQueueSize_) {
         EV << "MecServiceBase::newSubscriptionEvent - subscription queue is full. Deleting event..." << endl;

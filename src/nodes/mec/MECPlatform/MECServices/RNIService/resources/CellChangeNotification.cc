@@ -30,11 +30,11 @@ nlohmann::ordered_json CellChangeNotification::toJson() const
     val["hoStatus"] = FilterCriteriaAssocHo::getHoStatusString(hoStatus_);
 
     val["srcEcgi"]["cellId"] = srcEcgi_.getCellId();
-    val["srcEcgi"]["plmnId"]["mcc"] = srcEcgi_.getPlmn().getMcc();
-    val["srcEcgi"]["plmnId"]["mnc"] = srcEcgi_.getPlmn().getMnc();
+    val["srcEcgi"]["plmn"]["mcc"] = srcEcgi_.getPlmn().getMcc();
+    val["srcEcgi"]["plmn"]["mnc"] = srcEcgi_.getPlmn().getMnc();
     val["trgEcgi"]["cellId"] = trgEcgi_.getCellId();
-    val["trgEcgi"]["plmnId"]["mcc"] = trgEcgi_.getPlmn().getMcc();
-    val["trgEcgi"]["plmnId"]["mnc"] = trgEcgi_.getPlmn().getMnc();
+    val["trgEcgi"]["plmn"]["mcc"] = trgEcgi_.getPlmn().getMcc();
+    val["trgEcgi"]["plmn"]["mnc"] = trgEcgi_.getPlmn().getMnc();
 
     val["_links"]["href"] = links_;
     return val;
@@ -70,12 +70,12 @@ bool CellChangeNotification::fromJson(const nlohmann::ordered_json& json)
     // FIXME plmn from json
     srcEcgi_.setCellId(json["srcEcgi"]["cellId"]);
     mec::Plmn plmn;
-    plmn.mcc = json["srcEcgi"]["plmnId"]["mcc"];
-    plmn.mnc = json["srcEcgi"]["plmnId"]["mnc"];
+    plmn.mcc = json["srcEcgi"]["plmn"]["mcc"];
+    plmn.mnc = json["srcEcgi"]["plmn"]["mnc"];
     srcEcgi_.setPlmn(plmn);
     trgEcgi_.setCellId(json["trgEcgi"]["cellId"]);
-    plmn.mcc = json["trgEcgi"]["plmnId"]["mcc"];
-    plmn.mnc = json["trgEcgi"]["plmnId"]["mnc"];
+    plmn.mcc = json["trgEcgi"]["plmn"]["mcc"];
+    plmn.mnc = json["trgEcgi"]["plmn"]["mnc"];
     trgEcgi_.setPlmn(plmn);
     return result;
 }

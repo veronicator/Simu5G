@@ -45,6 +45,8 @@ class Binder : public cSimpleModule
 
     typedef std::map<MacNodeId, std::map<MacNodeId, bool>> DeployedUesMap;
 
+     std::map<MacNodeId, cModule*> macNodeIdToRnis_;
+
     std::map<inet::Ipv4Address, MacNodeId> macNodeIdToIPAddress_;
     std::map<inet::Ipv4Address, MacNodeId> nrMacNodeIdToIPAddress_;
     std::map<MacNodeId, std::string> macNodeIdToModuleName_;
@@ -634,6 +636,18 @@ class Binder : public cSimpleModule
     void setStartMECHostHandover (simtime_t startTime) {
         startMECHostHandover = startTime;
     }
+
+    /*
+     * method to map each node to the rnis module monitoring it
+     */
+     void registerMacNodeToRnis(MacNodeId nodeId, cModule *rnis) {
+         macNodeIdToRnis_[nodeId] = rnis;
+     }
+
+     /*
+      * method to signal the UE handover event to RNIS
+      */
+     void signalHandover(MacNodeId nodeId, MacNodeId srcCellId, MacNodeId trgCellId);
 
 };
 

@@ -34,6 +34,8 @@ public:
     void setHoStatus(std::vector<HoStatus> hoStatus){hoStatus_ = hoStatus;};
     void setHoStatusEcgi(std::vector<Ecgi> ecgi){ecgi_ = ecgi;};
 
+    void setFilterCriteriaValueFromJson(const nlohmann::ordered_json& json);
+
     std::vector<AssociateId> getAssociateId() const {return associateId_;}
     std::vector<HoStatus> getHoStatus() const {return hoStatus_;}
     std::vector<Ecgi> getHoStatusEcgi() const {return ecgi_;}

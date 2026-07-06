@@ -22,7 +22,10 @@ simple MecAppBase like IMECApp, IApp
     parameters:
         @display("i=block/app;is=s");
 
+		// parameter indicating if the mec app can register to AMS for mobility aspects (mobility awareness of the mec app)
         bool mobilityAware = default(false);
+        // param for configuring the mobility level of the mec app in case it is subjet to migration procedures
+        string appMobilityLevel = default("APP_MOBILITY_WITH_CONFIRMATION");	// {APP_MOBILITY_NOT_ALLOWED, APP_MOBILITY_WITH_CONFIRMATION, APP_MOBILITY_WITHOUT_CONFIRMATION}
         int mecAppId;      // will be assigned by the VIM upon Mec App instantiation
 
         string mp1Address = default("");

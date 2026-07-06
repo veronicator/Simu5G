@@ -82,10 +82,20 @@ bool CellChangeSubscription::fromJson(const nlohmann::ordered_json& json)
     if(json.contains("requestTestNotification"))
         requestTestNotification_ = json["requestTestNotification"];
     
+    if (json.contains("callbackReference")) {
+        std::string callbackReference = json["callbackReference"];
+        // parse it to retrieve the resource uri and
+        // the host
+        std::size_t found = callbackReference.find("/");
+        if (found != std::string::npos) {
+            clientHost_ = callbackReference.substr(0, found);
+            clientUri_ = callbackReference.substr(found);
+        }
+    }
+
     if(json.contains("websockNotifConfig"))
         result = result && websockNotifConfig_.fromJson(json["websockNotifConfig"]);
     // TODO missing anyof
-    result = result && filterCriteria_->fromJson(json["filterCriteriaAssocHo"]);
     return result;
 }
 

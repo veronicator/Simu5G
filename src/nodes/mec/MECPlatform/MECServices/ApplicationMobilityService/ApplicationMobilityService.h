@@ -50,7 +50,7 @@ struct SubscriptionLinkList
 
 class ApplicationMobilityService : public MecServiceBase2
 {
-  std::string baseUriSerDer_;
+  std::string baseUriServiceRegistration_;
   std::string callbackUri_; // uri used to receive notification from RNI service
   int applicationServiceIds;
   ApplicationMobilityResource *registrationResources_;
@@ -58,12 +58,14 @@ class ApplicationMobilityService : public MecServiceBase2
   // list of subscription for that device
   std::map<std::string, SubscriptionLinkList> subscriptionLinkList; // Not used so far..
 
-
   int migrationCounter_;
   simsignal_t totalMigrationsSignal_;
 
 //  // socket to communicate with RNIS
   inet::TcpSocket *rnisSocket_ = nullptr;
+
+  protected:
+    std::map<int, inet::ChunkQueue> socketQueue;
 
   public:
     ApplicationMobilityService();
@@ -79,7 +81,14 @@ class ApplicationMobilityService : public MecServiceBase2
     void handlePUTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket)    override;
     void handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket) override;
 
+    void socketDataArrived(inet::TcpSocket *socket, inet::Packet *packet, bool urgent) override;
+
+    void handleRnisMessage(cMessage *msg);
+    void handleRnisRequestMessage(const HttpRequestMessage *msg);
+    void handleRnisResponseMessage(const HttpResponseMessage *msg);
+
     void handleSubscriptionRequest(SubscriptionBase *subscription, inet::TcpSocket* socket, const nlohmann::ordered_json& request);
+    void handleCellChangeNotification(const nlohmann::ordered_json& request);
     void handleNotificationCallback(const nlohmann::ordered_json& request);
 
     void sendCellChangeSubscription();

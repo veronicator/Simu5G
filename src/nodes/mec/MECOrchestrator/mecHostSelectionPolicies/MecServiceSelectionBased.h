@@ -22,6 +22,7 @@ class MecServiceSelectionBased : public SelectionPolicyBase
 {
   protected:
     cModule *findBestMecHost(const ApplicationDescriptor&) override;
+    cModule *findBestTargetMecHost(const ApplicationDescriptor&, std::vector<cModule *> eligibleTargetMecHosts) override;
 
   public:
     MecServiceSelectionBased(MecOrchestrator *mecOrchestrator) : SelectionPolicyBase(mecOrchestrator) {}

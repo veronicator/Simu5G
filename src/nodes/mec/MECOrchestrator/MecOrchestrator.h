@@ -94,6 +94,7 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
 
     //parent modules
     std::vector<cModule *> mecHosts;
+    std::map<MacNodeId, std::vector<cModule *>> cellToMecHosts;
 
     //storing the UEApp and MEApp information
     //key = contextId - value mecAppMapEntry
@@ -142,11 +143,14 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     // to delete the MEC app
     void stopMECApp(UALCMPMessage *msg);
 
-    // handling STOP_MIGRATED_INSTANCE_APP type
-    // send a message to the MEPM of the source MecHost to stop the instance of the migrated MecApp
+    /*
+     * handling STOP_MIGRATED_INSTANCE_APP type
+     * send a message to the MEPM of the source MecHost to stop the instance of the migrated MecApp
+     */
     void stopMigratedMecApp(bool result, int ueAppId, int contextId);
 
-    void migrateMECApps(cMessage *msg);
+    void migrateAllMecApps(cMessage *msg);
+    void migrateMecApp(cMessage *msg);
     void handleMigrateAppAck(cMessage *msg);
 
     // sending ACK_CREATE_CONTEXT_APP or ACK_DELETE_CONTEXT_APP
@@ -175,6 +179,11 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
      * This method gets the references to them.
      */
     void getConnectedMecHosts();
+
+    /*
+     * This method gets the mapping between each base station and all associated Mec Hosts
+     */
+    void getCellMecHostsConnections();
 
     /*
      * The list of the MEC app descriptor to be onboarded at initialization time is

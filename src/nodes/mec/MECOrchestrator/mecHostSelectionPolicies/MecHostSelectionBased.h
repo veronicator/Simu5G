@@ -23,6 +23,7 @@ class MecHostSelectionBased : public SelectionPolicyBase
   protected:
     int mecHostIndex_;
     cModule *findBestMecHost(const ApplicationDescriptor&) override;
+    cModule *findBestTargetMecHost(const ApplicationDescriptor&, std::vector<cModule *> eligibleTargetMecHosts) override;
 
   public:
     MecHostSelectionBased(MecOrchestrator *mecOrchestrator, int index);

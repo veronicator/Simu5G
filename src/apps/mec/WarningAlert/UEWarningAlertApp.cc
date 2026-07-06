@@ -125,8 +125,12 @@ void UEWarningAlertApp::handleMessage(cMessage *msg)
          */
         if (ipAdd == deviceAppAddress_ || ipAdd == inet::L3Address("127.0.0.1")) { // dev app
             auto mePkt = packet->peekAtFront<DeviceAppPacket>();
-            if (!strcmp(mePkt->getType(), ACK_START_MECAPP)) handleAckStartMEWarningAlertApp(msg);
-            else if (!strcmp(mePkt->getType(), ACK_STOP_MECAPP)) handleAckStopMEWarningAlertApp(msg);
+            if (!strcmp(mePkt->getType(), ACK_START_MECAPP))
+                handleAckStartMEWarningAlertApp(msg);
+            else if (!strcmp(mePkt->getType(), ACK_STOP_MECAPP))
+                handleAckStopMEWarningAlertApp(msg);
+            else if (!strcmp(mePkt->getType(), MIGRATE_MECAPP))
+                handleMigrateMecApp(msg->dup());
             else {
                 throw cRuntimeError("UEWarningAlertApp::handleMessage - \tFATAL! Error, DeviceAppPacket type %s not recognized", mePkt->getType());
             }
@@ -324,6 +328,29 @@ void UEWarningAlertApp::handleAckStopMEWarningAlertApp(cMessage *msg)
     ue->getDisplayString().setTagArg("i", 1, "white");
 
     cancelEvent(selfStop_);
+}
+
+void UEWarningAlertApp::handleMigrateMecApp(cMessage *msg)
+{
+    EV << "UEWarningAlertApp::handleMigrateMecApp - Received Migrate packet" << endl;
+    inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
+    auto pkt = packet->peekAtFront<DeviceAppStartAckPacket>();
+
+    if (pkt->getResult() == true) {
+
+        mecAppAddress_ = L3AddressResolver().resolve(pkt->getIpAddress());
+        mecAppPort_ = pkt->getPort();
+        EV << "UEWarningAlertApp::handleMigrateMecApp - Received " << pkt->getType() << " type RequestPacket. mecApp instance is at: " << mecAppAddress_ << ":" << mecAppPort_ << endl;
+        cancelEvent(selfStart_);
+
+        if (!selfStop_->isScheduled()) {
+            simtime_t stopTime = par("stopTime");
+            scheduleAt(simTime() + stopTime, selfStop_);
+            EV << "UEWarningAlertApp::handleMigrateMecApp - Starting sendStopMEWarningAlertApp() in " << stopTime << " seconds " << endl;
+        }
+    }
+
+    delete packet;
 }
 
 } //namespace

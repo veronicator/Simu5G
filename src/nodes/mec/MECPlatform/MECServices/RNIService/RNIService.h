@@ -32,18 +32,30 @@ class RNIService : public MecServiceBase2
 
   public:
     RNIService();
+    void receiveHandoverSignal(MacNodeId nodeId, MacNodeId srcCellId, MacNodeId trgCellIds);
 
   protected:
 
     void initialize(int stage) override;
     void finish() override;
+    void handleMessage(cMessage *msg) override;
 
     void handleGETRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) override;
     void handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket)   override;
     void handlePUTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket)    override;
     void handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) override;
 
+    /*
+     * This method is called for every element in the subscriptions_ queue.
+     */
+    bool manageSubscription() override;
 
+//    // subscription related methods
+    void handleSubscriptionRequest(SubscriptionBase *subscription, inet::TcpSocket* socket, const nlohmann::ordered_json& request);
+//
+//    ~RNIService();
+  private:
+    void printAllSubscriptions();
 };
 
 } //namespace

@@ -99,7 +99,7 @@ void MecPlatformManager::socketDataArrived(inet::TcpSocket *socket, inet::Packet
             auto meoMsg = queue.pop<MECAppMessage>(b(-1));
 //            auto meMsg = msg->peekAtFront<MECAppMessage>();
             if (!strcmp(meoMsg->getType(), MIGRATE_MEAPP))
-                migrateMecApp(new Packet("CreateAppMessage", meoMsg));
+                instantiateMigratingMecApp(new Packet("CreateAppMessage", meoMsg));
              else if (!strcmp(meoMsg->getType(), STOP_MIGRATED_MEAPP))
                 stopMigratedMecApp(new Packet("DeleteAppMessage", meoMsg));
             /*  // todo gestire casi start / stop
@@ -152,8 +152,29 @@ bool MecPlatformManager::terminateMEApp(DeleteAppMessage *msg)
     return res;
 }
 
+void MecPlatformManager::triggerMecAppMigration(AssociateId associateId, std::vector<std::string> appInstanceIds, MacNodeId srcEcgi, MacNodeId trgEcgi) {
+
+    Enter_Method_Silent("MecPlatformManager::triggerMecAppMigration");
+
+    EV << "MecPlatformManager::triggerMecAppMigration" << endl;
+
+    inet::Packet *newPkt = new inet::Packet("TriggerMigrateAppMessage");
+    auto migrateMsg = inet::makeShared<TriggerMigrationAppMessage>();
+    migrateMsg->setType(MIGRATE_MEAPP);
+    migrateMsg->setAssociateId(associateId);
+    migrateMsg->setAppInstanceIds(appInstanceIds);
+    migrateMsg->setSrcCellId(srcEcgi);
+    migrateMsg->setTrgCellId(trgEcgi);
+    inet::B msgSize = inet::B(40 + strlen(migrateMsg->getType()) + strlen(associateId.getType().c_str()) + strlen(associateId.getValue().c_str())
+            + sizeof(appInstanceIds));
+    migrateMsg->setChunkLength(msgSize);
+
+    newPkt->insertAtBack(migrateMsg);
+    meoSocket_.send(newPkt);
+}
+
 /*
- * request migration MecApps to another MecHost
+ * request migration of MecApps to another MecHost after source MEC host handover
  */
 void MecPlatformManager::migrateMecAppsReq()
 {
@@ -163,7 +184,7 @@ void MecPlatformManager::migrateMecAppsReq()
 
     inet::Packet *newPkt = new inet::Packet("MigrateAppMessage");
     auto migrateMsgReq = inet::makeShared<MigrateAppMessage>();
-    migrateMsgReq->setType(MIGRATE_MEAPP_REQ);
+    migrateMsgReq->setType(MIGRATE_MEAPPS_REQ);
     migrateMsgReq->setMepmAddress(mepmAddress_.str().c_str());
     migrateMsgReq->setMepmId(getId());
     inet::B msgSize = inet::B(40 + strlen(migrateMsgReq->getType()) + strlen(migrateMsgReq->getMepmAddress()));
@@ -175,7 +196,7 @@ void MecPlatformManager::migrateMecAppsReq()
 }
 
 // instancing the requested MECApp (called by socketDataArrived)
-void MecPlatformManager::migrateMecApp(cMessage *msg)
+void MecPlatformManager::instantiateMigratingMecApp(cMessage *msg)
 {
     Enter_Method_Silent("MecPlatformManager::migrateMEApp");
 
@@ -193,15 +214,14 @@ void MecPlatformManager::migrateMecApp(cMessage *msg)
         migrateAckMsg->setContextId(contextId);
         migrateAckMsg->setStatus(res->status);
         migrateAckMsg->setInstanceId(res->instanceId.c_str());
-        migrateAckMsg->setEndPointAddr(res->endPoint.addr.str().c_str());
-        migrateAckMsg->setEndPointPort(res->endPoint.port);
         migrateAckMsg->setModuleId(res->reference->getId());
+        migrateAckMsg->setEndPoint(res->endPoint);
 
         migrateAckMsg->setMepmId(getId());
         migrateAckMsg->setMepmAddress(mepmAddress_.str().c_str());
 
         inet::B msgSize = inet::B(50 + strlen(migrateAckMsg->getType()) + strlen(migrateAckMsg->getMepmAddress())
-                + strlen(migrateAckMsg->getInstanceId()) + strlen(migrateAckMsg->getEndPointAddr()));
+                + strlen(migrateAckMsg->getInstanceId()) + strlen(migrateAckMsg->getEndPoint().addr.str().c_str()));
 
         migrateAckMsg->setChunkLength(msgSize);
         inet::Packet *newPkt = new inet::Packet("MigrateAppAckMessage");

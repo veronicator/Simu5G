@@ -26,6 +26,7 @@ class SelectionPolicyBase
   protected:
     MecOrchestrator *mecOrchestrator_ = nullptr;
     virtual cModule *findBestMecHost(const ApplicationDescriptor&) = 0;
+    virtual cModule *findBestTargetMecHost(const ApplicationDescriptor&, std::vector<cModule *> eligibleTargetMecHosts) = 0;
 
   public:
     SelectionPolicyBase(MecOrchestrator *mecOrchestrator) : mecOrchestrator_(mecOrchestrator) {}

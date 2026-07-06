@@ -22,13 +22,15 @@ class NRPhyUe : public LtePhyUeD2D
 {
     friend class MobileMECHost;
 
+  public:
+
+    /** Statistic for handover */
+    static simsignal_t handoverServingCellSignal_;
+
   protected:
 
     // reference to the parallel PHY layer
     inet::ModuleRefByPar<NRPhyUe> otherPhy_;
-
-    /** Statistic for handover */
-    static simsignal_t handoverServingCellSignal_;
 
     void initialize(int stage) override;
     void handleAirFrame(cMessage *msg) override;

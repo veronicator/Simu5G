@@ -121,9 +121,63 @@ cModule *MigrationMecServiceSelectionBased::findNewBestMecHost(const Application
     if (bestHost != nullptr && !found)
         EV << "MigrationMecServiceSelectionBased::findNewBestMecHost - The best Mec Host does not have the required service. Best MEC host: " << bestHost << endl;
     else if (bestHost == nullptr)
-        EV << "MigrationMecServiceSelectionBased::findNewBestMecHost - no MEC host found" << endl;
+        EV << "MigrationMigrationMecServiceSelectionBased::findNewBestMecHost - no MEC host found" << endl;
 
     return bestHost;
+}
+
+
+cModule *MigrationMecServiceSelectionBased::findBestTargetMecHost(const ApplicationDescriptor& appDesc, std::vector<cModule *> eligibleTargetMecHosts) {
+    EV << "MigrationecServiceSelectionBased::findBestTargetMecHost - finding best MecHost..." << endl;
+        cModule *bestHost = nullptr;
+        bool found = false;
+
+        for (auto mecHost : eligibleTargetMecHosts) {
+            EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - MEC host [" << mecHost->getName() << "] size of mecHost " << eligibleTargetMecHosts.size() << endl;
+            VirtualisationInfrastructureManager *vim = check_and_cast<VirtualisationInfrastructureManager *>(mecHost->getSubmodule("vim"));
+            ResourceDescriptor resources = appDesc.getVirtualResources();
+            bool res = vim->isAllocable(resources.ram, resources.disk, resources.cpu);
+            if (!res) {
+                EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - MEC host [" << mecHost->getName() << "] does not have enough resources. Searching again..." << endl;
+                continue;
+            }
+
+            // Temporarily select this mec host as the best
+            EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - MEC host [" << mecHost->getName() << "] temporarily chosen as the best MEC host, checking for the required MEC services.." << endl;
+            bestHost = mecHost;
+
+            MecPlatformManager *mecpm = check_and_cast<MecPlatformManager *>(mecHost->getSubmodule("mecPlatformManager"));
+            auto mecServices = mecpm->getAvailableMecServices();
+            std::string serviceName;
+
+            // I assume the app requires only one mec service
+            if (appDesc.getAppServicesRequired().size() > 0) {
+                serviceName = appDesc.getAppServicesRequired()[0];
+                EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - required Mec Service: " << serviceName << endl;
+            }
+            else {
+                EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - the Mec App does not require any MEC service. Choosing the temporary Mec Host as the best one" << endl;
+                found = true;
+                break;
+            }
+            for (const auto& service : *mecServices) {
+                if (serviceName == service.getName() && service.getMecHost() == bestHost->getName()) {
+                    EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - The temporary Mec Host has the MEC service " << service.getName() << " required by the Mec App. It has been chosen as the best one" << endl;
+                    bestHost = mecHost;
+                    found = true;
+                    break;
+                }
+            }
+            if (found)
+                break;
+        }
+
+        if (bestHost != nullptr && !found)
+            EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - The best Mec Host does not have the required service. Best MEC host: " << bestHost << endl;
+        else if (bestHost == nullptr)
+            EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - no MEC host found" << endl;
+
+        return bestHost;
 }
 
 } //namespace

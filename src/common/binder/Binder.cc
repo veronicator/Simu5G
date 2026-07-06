@@ -17,6 +17,7 @@
 #include "common/binder/Binder.h"
 #include "corenetwork/statsCollector/BaseStationStatsCollector.h"
 #include "corenetwork/statsCollector/UeStatsCollector.h"
+#include "nodes/mec/MECPlatform/MECServices/RNIService/RNIService.h"
 #include "stack/mac/LteMacUe.h"
 #include "stack/phy/LtePhyUe.h"
 
@@ -1192,6 +1193,17 @@ RanNodeType Binder::getBaseStationTypeById(MacNodeId cellId)
         return UNKNOWN_NODE_TYPE;
     }
 }
+
+ void Binder::signalHandover(MacNodeId nodeId, MacNodeId srcCellId, MacNodeId trgCellId) {
+     EV << "Binder::signalHandover" << endl;
+     auto it = macNodeIdToRnis_.find(nodeId);
+     if (it == macNodeIdToRnis_.end())
+         return;
+
+     RNIService *rnis = check_and_cast<RNIService *>(it->second);
+     rnis->receiveHandoverSignal(nodeId, srcCellId, trgCellId);
+
+ }
 
 } //namespace
 

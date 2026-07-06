@@ -390,6 +390,8 @@ void NRPhyUe::doHandover()
     emit(servingCellSignal_, (long)masterId_);
     emit(handoverServingCellSignal_, (intval_t)masterId_);
 
+    binder_->signalHandover(nodeId_, oldMaster, masterId_);
+
     if (masterId_ == NODEID_NONE)
         EV << NOW << " NRPhyUe::doHandover - UE " << nodeId_ << " detached from the network" << endl;
     else

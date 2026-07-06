@@ -12,7 +12,7 @@
 
 namespace simu5g {
 
-class CellChangeNotification : public NotificationBase{
+class CellChangeNotification : public NotificationBase {
 public:
     CellChangeNotification();
     virtual ~CellChangeNotification();

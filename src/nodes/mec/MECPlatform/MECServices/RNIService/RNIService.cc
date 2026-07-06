@@ -24,7 +24,9 @@
 #include <inet/transportlayer/contract/tcp/TcpSocket.h>
 
 #include "common/utils/utils.h"
+#include "nodes/mec/MECPlatform/EventNotification/CellChangeEvent.h"
 #include "nodes/mec/MECPlatform/MECServices/Resources/SubscriptionBase.h"
+#include "nodes/mec/MECPlatform/MECServices/RNIService/resources/CellChangeSubscription.h"
 #include "nodes/mec/utils/httpUtils/httpUtils.h"
 
 namespace simu5g {
@@ -52,12 +54,80 @@ void RNIService::initialize(int stage)
     }
 }
 
+void RNIService::receiveHandoverSignal(MacNodeId nodeId, MacNodeId srcCellId, MacNodeId trgCellId) {
+    Enter_Method_Silent("RNIService::receiveHandoverSignal");
+    EV << "RNIService::receiveHandoverSignal" << endl;
+    inet::Ipv4Address ipAddress = binder_->getIPv4Address(nodeId);
+    std::vector<unsigned int> subIds;
+    // find all cellChangeSubscriptions where the associateId corresponds to the ip address of UE performing handover
+    for (auto subscription: subscriptions_) {
+        if (subscription.second->getSubscriptionType() == "CellChangeSubscription") {
+            CellChangeSubscription *cellChangeSub = check_and_cast<CellChangeSubscription*>(subscription.second);
+            std::vector<AssociateId> associateIds = check_and_cast<FilterCriteriaAssocHo*>(cellChangeSub->getFilterCriteria())->getAssociateId();
+
+            for (auto associateId: associateIds) {
+                if (associateId.getValue() == ipAddress.str()) {
+                    subIds.push_back(subscription.first);
+                    break;
+                }
+            }
+        }
+    }
+    // for all subscription found -> send a CellChangeNotification
+    for (auto subId: subIds) {
+        nlohmann::ordered_json notificationBody_;
+        notificationBody_["notificationType"] = "CellChangeNotification";
+        TimeStamp ts = new TimeStamp();
+        ts.setSeconds();
+        notificationBody_["timeStamp"] = ts.toJson();
+        nlohmann::ordered_json associateId;
+        associateId["type"] = "UE_IPv4_ADDRESS";    // other types are not managed yet
+        associateId["value"] = ipAddress.str();
+        notificationBody_["associateId"] = nlohmann::ordered_json::array(); //associateId;
+        notificationBody_["associateId"].push_back(associateId);
+
+        notificationBody_["srcEcgi"]["plmn"]["mcc"] = "001";    // test value, not used -> change if needed
+        notificationBody_["srcEcgi"]["plmn"]["mnc"] = "01";     // test value
+        notificationBody_["srcEcgi"]["cellId"] = srcCellId;
+        notificationBody_["trgEcgi"]["plmn"]["mcc"] = "001";    // test value, not used -> change if needed
+        notificationBody_["trgEcgi"]["plmn"]["mnc"] = "01";     // test value
+        notificationBody_["trgEcgi"]["cellId"] = trgCellId;
+        notificationBody_["hoStatus"] = hoStatusString[COMPLETED];
+        notificationBody_["_links"]["href"] = baseUriSubscriptions_ + "/" + std::to_string(subId);
+
+        CellChangeSubscription *cellChangeSub = check_and_cast<CellChangeSubscription*>(subscriptions_[subId]);
+
+        inet::TcpSocket *sock = static_cast<inet::TcpSocket *>(socketMap.getSocketById(cellChangeSub->getSocketConnId()));
+        if (sock != nullptr) {
+            std::string callbackRef = cellChangeSub->toJson()["callbackReference"];
+            std::size_t found = callbackRef.find("/");
+            if (found != std::string::npos) {
+                std::string host  = callbackRef.substr(0, found);
+                std::string uri = callbackRef.substr(found);
+                EV << "receiveHandoverSignal - callbackRef: " << callbackRef << " - host: " << host << " - uri: " << uri << endl;
+                Http::sendPostRequest(sock, notificationBody_.dump().c_str(), host.c_str(), uri.c_str());
+            }
+        }
+    }
+}
+
+
+void RNIService::handleMessage(cMessage *msg)
+{
+    EV << "RNIService::handleMessage"  << endl;
+    if (msg->isSelfMessage()) {
+        EV << "RNIService::handleMessage - self"  << endl;
+    }
+    MecServiceBase::handleMessage(msg);
+}
+
 void RNIService::handleGETRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket)
 {
     std::string uri = currentRequestMessageServed->getUri();
 
     // check if it is a GET for a query or a subscription
     if (uri == (baseUriQueries_ + "/layer2_meas")) { //queries
+        EV << "RNIService::handleGETRequest - queries"  << endl;
         std::string params = currentRequestMessageServed->getParameters();
         //look for query parameters
         if (!params.empty()) {
@@ -121,6 +191,7 @@ void RNIService::handleGETRequest(const HttpRequestMessage *currentRequestMessag
         }
         else {
             //no query params
+            EV << "RNIService::handleGETRequest - no query params" << endl;
             Http::send200Response(socket, L2MeasResource_.toJson().dump().c_str());
             return;
         }
@@ -135,13 +206,124 @@ void RNIService::handleGETRequest(const HttpRequestMessage *currentRequestMessag
 }
 
 void RNIService::handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) {
-    // todo
+
+    EV << "RNIService::handlePOSTRequest - Received a POST request" << endl;
+    std::string uri = currentRequestMessageServed->getUri();
+    std::string body = currentRequestMessageServed->getBody();
+
+    if(uri.compare(baseUriSubscriptions_) == 0) {
+        nlohmann::ordered_json request;
+        try {
+            request = nlohmann::json::parse(body);
+        } catch (nlohmann::detail::parse_error e) {
+            std::cout << "RNIService::handlePOSTRequest" << e.what() << "\n" << body << std::endl;
+            // body is not correctly formatted in JSON, manage it
+            Http::send400Response(socket); // bad body JSON
+            return;
+        }
+        if(request.contains("subscriptionType")) {
+            SubscriptionBase *newSubscription = nullptr;
+            if(request["subscriptionType"] == "CellChangeSubscription") {
+            EV << "RNIService::handlePOSTRequest - cellChangeSub "<< endl;
+                newSubscription = new CellChangeSubscription(subscriptionId_, socket, baseSubscriptionLocation_, eNodeB_);
+                bool res = newSubscription->fromJson(request);
+                if (res) {
+                    FilterCriteriaAssocHo *filterCriteria = check_and_cast<FilterCriteriaAssocHo *>(newSubscription->getFilterCriteria());
+                    filterCriteria->setFilterCriteriaValueFromJson(request["filterCriteriaAssocHo"]);
+
+                    for (auto& associateId: request["filterCriteriaAssocHo"]["associateId"].items()) {
+                        nlohmann::ordered_json val = associateId.value();
+                        EV << "RNIService::handlePOSTRequest - associateId: " << val["value"].get<std::string>() << endl;
+                        inet::L3Address ueAppAddr = inet::L3AddressResolver().resolve(val["value"].get<std::string>().c_str());
+                        if (val["type"] == "UE_IPv4_ADDRESS") {
+                            EV<< " associateId Type" << endl;
+                            MacNodeId macNodeId = binder_->getMacNodeId(ueAppAddr.toIpv4());
+                            binder_->registerMacNodeToRnis(macNodeId, this);
+                        }
+                    }
+                }
+                else {
+                    delete newSubscription;
+                    return;
+                }
+
+            }
+            // TODO define other type of subscriptions
+            if(newSubscription == nullptr)
+            {
+                EV << "RNIService::Subscription type not recognized" << endl;
+                Http::send400Response(socket);
+            }
+            else
+                // This method helps to avoid repeated code for the other type of subscription
+                handleSubscriptionRequest(newSubscription, socket, request);
+        }
+        else
+        {
+            EV << "RNIService::handlePOSTRequest - bad request: subscriptionType not found" << endl;
+            Http::send400Response(socket);
+        }
+
+
+    }
+    else // not found
+    {
+        Http::send404Response(socket);
+    }
 }
 
 void RNIService::handlePUTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) {}
 
 void RNIService::handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket)
 {
+}
+
+void RNIService::handleSubscriptionRequest(SubscriptionBase *subscription, inet::TcpSocket* socket, const nlohmann::ordered_json& request)
+{
+    EV << "RNIService::handleSubscriptionRequest - " << subscription->getSubscriptionType() << endl;
+
+    subscription->set_links(baseSubscriptionLocation_);
+    subscriptions_[subscriptionId_] = subscription;
+
+    // sending response
+    nlohmann::ordered_json response = subscription->toJson();
+    EV << "RNIService::handleSubscriptionRequest  - response: " << response << endl;
+    response["subscriptionId"] = subscriptionId_;
+
+    Http::send201Response(socket, response.dump().c_str());
+
+    EV << "RNIService::handleSubscriptionRequest - Added new subscriber [" << subscriptionId_ << "]" << endl;
+    subscriptionId_++;
+
+    // printing all subscriptions
+    printAllSubscriptions();
+
+    return;
+}
+
+bool RNIService::manageSubscription()
+{
+    int subId = currentSubscriptionServed_->getSubId();
+    if (subscriptions_.find(subId) != subscriptions_.end()) {
+        EV << "RNIService::manageSubscription() - subscription with id: " << subId << " found" << endl;
+        SubscriptionBase *sub = subscriptions_[subId];//upcasting (getSubscriptionType is in SubscriptionBase)
+        sub->sendNotification(currentSubscriptionServed_);
+        if (currentSubscriptionServed_ != nullptr)
+            delete currentSubscriptionServed_;
+        currentSubscriptionServed_ = nullptr;
+        return true;
+    }
+    return false;
+}
+
+void RNIService::printAllSubscriptions()
+{
+    auto it  = subscriptions_.begin();
+    auto end = subscriptions_.end();
+    for(; it != end; ++it)
+    {
+        EV << "SubscriptionId: " << it->first << " " << it->second->toJson() << endl;
+    }
 }
 
 void RNIService::finish()

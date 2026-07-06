@@ -42,11 +42,8 @@ bool NotificationBase::fromJson(const nlohmann::ordered_json& json)
         timestamp_.setSeconds(json["timeStamp"]["seconds"]);
         timestamp_.setNanoSeconds(json["timeStamp"]["nanoSeconds"]);
     }
-    if(json.contains("associateId"))
-
-    {
-        for(auto& it : json["associateId"].items())
-        {
+    if(json.contains("associateId")) {
+        for(auto& it : json["associateId"].items()) {
             AssociateId a;
 
             nlohmann::ordered_json val = it.value();
@@ -61,6 +58,8 @@ bool NotificationBase::fromJson(const nlohmann::ordered_json& json)
     // notificationType_ = json["notificationType"];
 
     links_ = json["_links"]["href"];
+
+    return true;
 }
 
 }   //namespace

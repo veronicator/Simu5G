@@ -15,6 +15,7 @@
 
 #include "nodes/mec/MECPlatform/MECServices/ApplicationMobilityService/ApplicationMobilityService.h"
 #include "nodes/mec/MECPlatform/MECServices/RNIService/resources/FilterCriteriaAssocHo.h"
+#include "nodes/mec/MECPlatform/MECServices/RNIService/resources/CellChangeNotification.h"
 
 namespace simu5g {
 
@@ -25,9 +26,9 @@ ApplicationMobilityService::ApplicationMobilityService()
 {
     registrationResources_ = new ApplicationMobilityResource();
     baseUriQueries_ = "/example/amsi/v1/queries/";
-    baseUriSerDer_ = "/example/amsi/v1/app_mobility_services"; // registration and deregistration uri
-    callbackUri_ = "/example/amsi/v1/eventNotification/";
-    baseUriSubscriptions_ = "/example/amsi/v1/subscriptions/";
+    baseUriServiceRegistration_ = "/example/amsi/v1/app_mobility_services"; // registration and deregistration uri
+    callbackUri_ = "/example/amsi/v1/eventNotification";
+    baseUriSubscriptions_ = "/example/amsi/v1/subscriptions";
     baseSubscriptionLocation_ = host_+ baseUriSubscriptions_;
 
     applicationServiceIds = 0;
@@ -74,9 +75,9 @@ void ApplicationMobilityService::handleMessage(cMessage *msg)
                         notification->setTargetAppInfo(*el.second);
 
                         // statistics
-                        simtime_t migrationUpdateTime = simTime();
+//                        simtime_t migrationUpdateTime = simTime();
                         // total migration from the start
-                        migrationCounter_ ++;
+                        migrationCounter_++;
                         std::cout << "Migration counter has been updated: " << migrationCounter_ << endl;
 
                         // migration at this time (useful to set grop migration per an interval of time)
@@ -153,15 +154,15 @@ void ApplicationMobilityService::handleGETRequest(const HttpRequestMessage *curr
         EV << "AMS::This API has not been implemented yet!" << endl;
         Http::send404Response(socket);
     }
-    else if(uri.compare(baseUriSerDer_) == 0)
+    else if(uri.compare(baseUriServiceRegistration_) == 0)
     {
         EV << "AMS::Retrieve information about the registered application mobility service" << endl;
         nlohmann::ordered_json response = registrationResources_->toJson();
         Http::send200Response(socket, response.dump().c_str());
     }
-    else if(uri.find(baseUriSerDer_) == 0)
+    else if(uri.find(baseUriServiceRegistration_) == 0)
     {
-        uri.erase(0, baseUriSerDer_.length());
+        uri.erase(0, baseUriServiceRegistration_.length());
         if(uri.length() > 0 && uri.find("deregister_task") == std::string::npos)
         {
             EV << "AMS::Getting specific id " << endl;
@@ -218,28 +219,29 @@ void ApplicationMobilityService::handleGETRequest(const HttpRequestMessage *curr
 void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket) {
     EV << "AMS::handlePOSTRequest" << endl;
     std::string uri = currentRequestMessageServed->getUri();
-    if(uri.compare(baseUriSerDer_) == 0) {
+    EV << "AMS::handlePOSTRequest - uri: " << uri << endl;
+    if(uri.compare(baseUriServiceRegistration_) == 0) {
+        EV << "AMS::handlePOSTRequest - baseUriSerDer_" << endl;
 
         nlohmann::ordered_json request = nlohmann::json::parse(currentRequestMessageServed->getBody());
-        RegistrationInfo* r = new RegistrationInfo();//registrationResources_->buildRegistrationInfoFromJson(request);
-        bool res = r->fromJson(request);
+        RegistrationInfo* regInfo = new RegistrationInfo();
+        bool res = regInfo->fromJson(request);
         if(!res) {
             EV << "AMS::Post request - bad request " << endl;
             Http::send400Response(socket);
             return;
         }
-        r->setAppMobilityServiceId(std::to_string(applicationServiceIds));
-        //request["appMobilityServiceId"] =  std::to_string(applicationServiceIds);
-        registrationResources_->addRegistrationInfo(r);
+        regInfo->setAppMobilityServiceId(std::to_string(applicationServiceIds));
+        registrationResources_->addRegistrationInfo(regInfo);
 
         applicationServiceIds++;
-        nlohmann::ordered_json response = r->toJson();
-        std::pair<std::string, std::string> p("Location: ", baseUriSerDer_);
+        nlohmann::ordered_json response = regInfo->toJson();
+        std::pair<std::string, std::string> p("Location: ", baseUriServiceRegistration_);
         EV << "AMS::Correctly subscribed sending: " << response.dump() <<endl;
         Http::send201Response(socket, response.dump(2).c_str(), p);
 
         if (rnisSocket_ != nullptr) {
-            //todo: send RNIS CellChangeSubscription
+            // send RNIS CellChangeSubscription
             std::string uristring = "/example/rni/v2/subscriptions";
             std::string host = rnisSocket_->getRemoteAddress().str()+":"+std::to_string(rnisSocket_->getRemotePort());
 
@@ -248,13 +250,13 @@ void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *cur
             subscriptionBody_["subscriptionType"] = "CellChangeSubscription";
             inet::L3Address localAddress = inet::L3AddressResolver().resolve(getParentModule()->getParentModule()->getFullPath().c_str());
             EV << "ApplicationMobilityService::handlePOSTRequest - send RNIS CellChangeSubscription - localAddress: " << localAddress << endl;
-            subscriptionBody_["callbackReference"] = localAddress.str() + ":" + std::to_string(par("localPort").intValue()) + callbackUri_;
+            subscriptionBody_["callbackReference"] =  localAddress.str() + ":" + std::to_string(par("localPort").intValue()) + callbackUri_;
             EV << "ApplicationMobilityService::handlePOSTRequest - send RNIS CellChangeSubscription - callbackReference: " << subscriptionBody_["callbackReference"] << endl;
             // subscriptionBody_["websockNotifConfig"] =
             subscriptionBody_["filterCriteriaAssocHo"]["appInstanceId"] = getName();
             subscriptionBody_["filterCriteriaAssocHo"]["associateId"] = nlohmann::ordered_json::array();
 
-            subscriptionBody_["filterCriteriaAssocHo"]["associateId"].push_back(r->getDeviceInformation()[0].getAssociateId().toJson());   //.push_back(ueId.toJson());
+            subscriptionBody_["filterCriteriaAssocHo"]["associateId"].push_back(regInfo->getDeviceInformation()[0].getAssociateId().toJson());   //.push_back(ueId.toJson());
             subscriptionBody_["filterCriteriaAssocHo"]["hoStatus"] = nlohmann::ordered_json::array();
             subscriptionBody_["filterCriteriaAssocHo"]["hoStatus"].push_back(hoStatusString[IN_PREPARATION]);
             // subscriptionBody_["filterCriteriaAssocHo"]["ecgi"] = nlohmann::ordered_json::array();
@@ -293,7 +295,10 @@ void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *cur
         // notification type
         nlohmann::ordered_json request = nlohmann::json::parse(currentRequestMessageServed->getBody());
         if(request.contains("notificationType")) {
-            handleNotificationCallback(request);
+            if(request["notificationType"] == "CellChangeNotification")
+                handleCellChangeNotification(request);
+            else
+                handleNotificationCallback(request);
         }
         else {
             EV << "AMS::Bad request!" << endl;
@@ -310,13 +315,12 @@ void ApplicationMobilityService::handlePUTRequest(const HttpRequestMessage *curr
 {
     EV << "AMS::handlePUTRequest" << endl;
     std::string uri = currentRequestMessageServed->getUri();
-    if(uri.find(baseUriSerDer_) == 0)
+    if(uri.find(baseUriServiceRegistration_) == 0)
     {
-        uri.erase(0, uri.find(baseUriSerDer_) + baseUriSerDer_.length());
+        uri.erase(0, uri.find(baseUriServiceRegistration_) + baseUriServiceRegistration_.length());
         EV << "AMS::received registration update from " << uri << endl;
         nlohmann::ordered_json request = nlohmann::json::parse(currentRequestMessageServed->getBody());
         // build registration info
-        //RegistrationInfo *r = registrationResources_->buildRegistrationInfoFromJson(request);
         RegistrationInfo *r = new RegistrationInfo();
         bool res = r->fromJson(request);
         if(!res)
@@ -404,10 +408,10 @@ void ApplicationMobilityService::handleDELETERequest(const HttpRequestMessage *c
 {
     EV << "AMS::handleDELETERequest" << endl;
     std::string uri = currentRequestMessageServed->getUri();
-    if(uri.find(baseUriSerDer_) == 0)
+    if(uri.find(baseUriServiceRegistration_) == 0)
     {
         EV << "AMS::Delete registration info " <<  endl;
-        uri.erase(0, uri.find(baseUriSerDer_) + baseUriSerDer_.length());
+        uri.erase(0, uri.find(baseUriServiceRegistration_) + baseUriServiceRegistration_.length());
         if(!registrationResources_->removeRegistrationInfo(uri.c_str()))
         {
             EV << "AMS::Delete request - service consumer not found!" << endl;
@@ -421,7 +425,7 @@ void ApplicationMobilityService::handleDELETERequest(const HttpRequestMessage *c
     else if(uri.find(baseUriSubscriptions_) == 0)
     {
         EV << "AMS::Delete subscription " <<  uri <<endl;
-        uri.erase(0,uri.find(baseUriSubscriptions_+"sub") + baseUriSubscriptions_.length() + 3);
+        uri.erase(0,uri.find(baseUriSubscriptions_+"/sub") + baseUriSubscriptions_.length() + 4);
         EV << "AMS::Deleting " <<  uri << endl;
         auto it = subscriptions_.find(std::atoi(uri.c_str()));
         if(it == subscriptions_.end())
@@ -440,6 +444,102 @@ void ApplicationMobilityService::handleDELETERequest(const HttpRequestMessage *c
     {
         EV << "AMS::DELETE request - bad uri " << endl;
         Http::send404Response(socket);
+    }
+}
+
+
+void ApplicationMobilityService::socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bool)
+{
+    EV << "ApplicationMobilityService::socketDataArrived" << endl;
+    if (socket == rnisSocket_) {
+        EV << "ApplicationMobilityService::socketDataArrived - rnisSocket" << endl;
+
+        if (msg->getKind() == TCP_I_DATA || msg->getKind() == TCP_I_URGENT_DATA) {
+            inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
+            int connId = socket->getSocketId();
+            ChunkQueue& queue = socketQueue[connId];
+            auto chunk = packet->peekDataAt(B(0), packet->getTotalLength());
+            queue.push(chunk);
+
+            while (queue.has<HttpBaseMessage>(b(-1))) {
+                EV << "ApplicationMobilityService::socketDataArrived - rnisSocket - while " << endl;
+                auto baseMsg = queue.pop<HttpBaseMessage>(b(-1));
+                handleRnisMessage(new Packet("RnisMessage", baseMsg));
+            }
+        }
+    }
+    delete msg;
+}
+
+void ApplicationMobilityService::handleRnisMessage(cMessage *msg) {
+    EV_INFO << "ApplicationMobilityService::handleRnisMessage - parsing message from Rnis" << endl;
+    inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
+    auto baseMsg = pkt->peekAtFront<HttpBaseMessage>();
+    auto response = dynamicPtrCast<const HttpResponseMessage>(baseMsg);
+    if (response != nullptr) {
+        EV_DEBUG << "ApplicationMobilityService::handleRnisMessage - RESPONSE" << endl;
+        handleRnisResponseMessage(response.get());
+        return;
+    }
+
+    auto request = dynamicPtrCast<const HttpRequestMessage>(baseMsg);
+    if (request != nullptr) {
+        EV_DEBUG << "ApplicationMobilityService::handleRnisMessage - REQUEST" << endl;
+        handleRnisRequestMessage(request.get());
+        return;
+    }
+
+    EV << "ApplicationMobilityService::handleRnisMessage - Unknown message type" << endl;
+    delete msg;
+}
+
+
+void ApplicationMobilityService::handleRnisRequestMessage(const HttpRequestMessage *request) {
+    EV_INFO << "ApplicationMobilityService::handleRnisRequestMessage" << endl;
+    EV_DEBUG << "Message body: " << endl << request->getBody() << endl;
+    nlohmann::json jsonBody = nlohmann::json::parse(request->getBody());
+    if(!jsonBody.empty()) {
+        if(jsonBody.contains("notificationType")) {
+            if(jsonBody["notificationType"] == "CellChangeNotification")
+                handleCellChangeNotification(jsonBody);
+            else
+                handleNotificationCallback(jsonBody);
+        }
+    }
+}
+
+void ApplicationMobilityService::handleRnisResponseMessage(const HttpResponseMessage *response) {
+    EV_INFO << "ApplicationMobilityService::handleRnisResponseMessage" << endl;
+
+    EV_DEBUG << "Message body: " << endl << response->getBody() << endl;
+
+    // Manage subscription response and polling
+    EV << "ApplicationMobilityService::handling Rnis response" << endl;
+    if(response->getCode() == 201) {
+       EV << "ApplicationMobilityService::handling RNI response - subscription ok: " << response->getBody() << endl;
+       nlohmann::json jsonBody = nlohmann::json::parse(response->getBody());
+       if(!jsonBody.empty()) {
+           // Correct subscription
+           std::stringstream stream;
+           stream << "sub" << jsonBody["subscriptionId"];
+           std::string subId_ = stream.str();
+           // todo: salvare il subscriptionId di ogni richiesta (cellChangeSubscription)
+
+           EV << "ApplicationMobilityService::handling Rnis response - jsonBody: " << jsonBody << endl;
+       }
+    }
+    else if(response->getCode() == 204) {
+       EV << "ApplicationMobilityService::handling RNI response - delete subscription ok" << endl;
+    //           responseCounter_--;
+    }
+    else if(response->getCode() == 400) {
+       EV << "ApplicationMobilityService::handling RNI response - bad request" << endl;
+    }
+    else if(response->getCode() == 404) {
+       EV << "ApplicationMobilityService::handling RNI response - not found" << endl;
+    }
+    else {
+       EV << "ApplicationMobilityService::handling RNI response - not recognized code error: " << response->getCode() << ", body:\n" << response->getBody() << endl;
     }
 }
 
@@ -479,6 +579,49 @@ void ApplicationMobilityService::handleSubscriptionRequest(SubscriptionBase *sub
     }
 }
 
+// trigger mec App migration sending a message to MEO through MEPM
+void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::ordered_json& request) {
+
+    EV << "AMS::CellChangeNotification received - trigger MecApp migration" << endl;
+    std::vector<RegistrationInfo *> registrationInfo;
+
+    CellChangeNotification *cellChangeNotification = new CellChangeNotification();
+    bool res = cellChangeNotification->fromJson(request);
+    if (res) {
+        EV << "Cell Change Notification processed: " << cellChangeNotification->toJson() << endl;
+        std::vector<std::string> appInstanceIds = registrationResources_->getAppInstanceIds(cellChangeNotification->getAssociateId());
+
+        Ecgi srcEcgi = cellChangeNotification->getSrcEcgi();
+        Ecgi trgEcgi = cellChangeNotification->getTrgEcgi();
+        auto associateIds = cellChangeNotification->getAssociateId();
+
+        EV << "AMS::CellChangeNotification - srcCellId " << srcEcgi.getCellId() << "; trgCellId " << trgEcgi.getCellId() << endl;
+
+        for (auto instanceId: appInstanceIds)
+            registrationInfo.push_back(registrationResources_->getRegistrationInfoFromAppId(instanceId));
+
+        for (auto regInfo: registrationInfo) {
+            for (auto devInfo: regInfo->getDeviceInformation()) {
+            EV << "AMS::CellChangeNotification - for - registrationInfo - deviceInfo" << endl;
+                if (devInfo.getAppMobilityServiceLevelString() == "APP_MOBILITY_NOT_ALLOWED") {
+                    EV << "AMS::CellChangeNotification - APP_MOBILITY_NOT_ALLOWED" << endl;
+                    continue;
+                }
+
+                // app mobility allowed
+                for (auto id: associateIds) {
+                    if (devInfo.getAssociateId().getValue().compare(id.getValue()) == 0) {
+                        EV << "AMS::CellChangeNotification - trigger migration" << endl;
+                        mecPlatformManager_->triggerMecAppMigration(id, appInstanceIds, srcEcgi.getCellId(), trgEcgi.getCellId());
+                    }
+                }
+            }
+        }
+    }
+
+    Http::send204Response(rnisSocket_); // no content
+}
+
 void ApplicationMobilityService::handleNotificationCallback(const nlohmann::ordered_json &request)
 {
     /*
@@ -490,19 +633,16 @@ void ApplicationMobilityService::handleNotificationCallback(const nlohmann::orde
     std::string subscriptionType = "";
     std::vector<int> ids;
     EV << "AMS::received notification request: " << request.dump(2) << endl;
-    if(request["notificationType"]=="MobilityProcedureNotification")
-    {
+    if(request["notificationType"] == "MobilityProcedureNotification") {
         notification = new MobilityProcedureNotification(registrationResources_);
         subscriptionType = "MobilityProcedureSubscription";
     }
-    else if(request["notificationType"]=="AdjacentAppInfoNotification")
-    {
+    else if(request["notificationType"] == "AdjacentAppInfoNotification") {
         EV << "AMS::Notification type not implemented" << endl;
         //Http::send400Response(socket);
         return;
     }
-    else
-    {
+    else {
         EV << "AMS::Notification type not managed " << endl;
 //        Http::send400Response(socket);
         return;
@@ -512,11 +652,10 @@ void ApplicationMobilityService::handleNotificationCallback(const nlohmann::orde
     bool res = notification->fromJson(request);
     EV << "Notification processed: " << notification->toJson() << endl;
     bool removeChecks;
-    if(res){
+    if(res) {
         std::vector<std::string> appInstanceId = registrationResources_->getAppInstanceIds(notification->getAssociateId());
 
-        for(auto subscriber : subscriptions_)
-        {
+        for(auto subscriber : subscriptions_) {
             EV << "AMS::processing subscriber: "<< subscriber.second->getSubscriptionId() << endl;
             EventNotification *event = nullptr;
             if(subscriptionType==subscriber.second->getSubscriptionType())
@@ -544,10 +683,9 @@ void ApplicationMobilityService::handleNotificationCallback(const nlohmann::orde
 bool ApplicationMobilityService::manageSubscription()
 {
     int subId = currentSubscriptionServed_->getSubId();
-    if(subscriptions_.find(subId) != subscriptions_.end())
-    {
+    if(subscriptions_.find(subId) != subscriptions_.end()) {
         EV << "ApplicationMobilityService::manageSubscription() - subscription with id: " << subId << " found" << endl;
-        SubscriptionBase * sub = subscriptions_[subId]; //upcasting (getSubscriptionType is in Subscriptionbase)
+        SubscriptionBase *sub = subscriptions_[subId]; //upcasting (getSubscriptionType is in Subscriptionbase)
         sub->sendNotification(currentSubscriptionServed_);
         if(currentSubscriptionServed_!= nullptr)
             delete currentSubscriptionServed_;
@@ -555,10 +693,8 @@ bool ApplicationMobilityService::manageSubscription()
 
         return true;
     }
-    else
-    {
-        return false;
-    }
+
+    return false;
 }
 
 void ApplicationMobilityService::printAllSubscriptions() {

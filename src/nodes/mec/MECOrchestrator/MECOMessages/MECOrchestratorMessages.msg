@@ -11,8 +11,31 @@
 
 import inet.common.INETDefs;
 import inet.common.packet.chunk.Chunk;
+import inet.networklayer.common.L3Address;
+import common.LteCommon;
+cplusplus {{
+#include "nodes/mec/MECPlatform/MECServices/RNIService/resources/AssociateId.h"
+#include "nodes/mec/utils/MecCommon.h"
+#include <vector>
+
+typedef std::vector<std::string> AppInstanceIdVector;
+}}
+
+class AppInstanceIdVector { @existingClass; }
 
 namespace simu5g;
+
+class AssociateId
+{
+    @existingClass;
+    @opaque;
+}
+
+struct SockAddr {
+    @existingClass;
+    @opaque;
+}
+    
 
 message MECOrchestratorMessage {
     int contextId; // identifier of the ueMecApp 
@@ -99,24 +122,8 @@ class MigrateAppMessage extends MECAppMessage {
    
     unsigned int sno;
     simtime_t timestamp;
-    
-//    //instantiation informations
-//    string MEModuleType;			//path where to find the cModule of the MEApp to instantiate
-//    string MEModuleName;			//module class name of the MEApp to instantiate
+
     int contextId;
-    
-//    //identification information
-//    int ueAppID;
-    
-//    //resources required
-//    double requiredDisk;
-//    double requiredRam;
-//    double requiredCpu;
-//    
-//    //service required
-//    string requiredService;
-//    //service provded
-//    string providedService;
     
 }
 
@@ -133,26 +140,21 @@ class MigrateAppAckMessage extends MECAppMessage {
 //    MecAppInstanceInfo appInfo;
     bool status;
     string instanceId;
-    string endPointAddr;	// cast to inet::L3Address
-    int endPointPort;
     int moduleId;		// mec app instance omnet module id
     
-//    struct SockAddr {
-//    inet::L3Address addr;
-//    int port;
-//    std::string str() const { return addr.str() + ":" + std::to_string(port); }
-//};
+    SockAddr endPoint;
     
-//    //type of message
-//    string type;
-//    struct MecAppInstanceInfo
-//    {
-//        bool status;
-//        string instanceId;
-//        SockAddr endPoint;
-//        cModule *reference;
-//    };
-//    
-    
+}
+
+class TriggerMigrationAppMessage extends MECAppMessage {
+    // msg type: MIGRATE_MEAPP
+   	
+   	AssociateId associateId;	// type, value
+   	AppInstanceIdVector appInstanceIds;	//mec app instance to migrate
+   	
+   	MacNodeId srcCellId;
+   	MacNodeId trgCellId;
+   	
+   	
 }
 

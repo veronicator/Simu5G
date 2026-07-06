@@ -193,7 +193,7 @@ void MecAppBase::handleMessage(cMessage *msg)
             EV << subscriptionBody_;
 
             std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str()+":"+std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());
-            std::string uristring = "/example/amsi/v1/subscriptions/";
+            std::string uristring = "/example/amsi/v1/subscriptions";
             Http::sendPostRequest(mecServices[AMS]->serviceSocket_, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
             responsecounter++;
         }
@@ -309,7 +309,7 @@ void MecAppBase::handleMp1Message(int connId) {
 }
 
 void MecAppBase::handleAmsMessage(int connId) {
-    // todo: implement handler for REQUEST and RESPONSE type messages from AMS
+    // handler for REQUEST and RESPONSE type messages from AMS
     // registration/subscription response, event notifications, etc.
     EV << "MecAppBase::handleAmsMessage " << endl;
     HttpMessageStatus *msgStatus = static_cast<HttpMessageStatus *>(mecServices[AMS]->serviceSocket_->getUserData());
@@ -425,7 +425,8 @@ void MecAppBase::sendAmsRegistration(cMessage *msg)
         associateId["value"] = ueAppAddress_.str();
 
         deviceInformation["associateId"] = associateId;
-        deviceInformation["appMobilityServiceLevel"] = "APP_MOBILITY_NOT_ALLOWED";
+        // enum AppMobilityServiceLevel {APP_MOBILITY_NOT_ALLOWED = 0, APP_MOBILITY_WITH_CONFIRMATION, APP_MOBILITY_WITHOUT_CONFIRMATION};
+        deviceInformation["appMobilityServiceLevel"] = par("appMobilityLevel");
         deviceInformation["contextTransferState"] = "NOT_TRANSFERRED";
 
         registrationBody["deviceInformation"].push_back(deviceInformation);

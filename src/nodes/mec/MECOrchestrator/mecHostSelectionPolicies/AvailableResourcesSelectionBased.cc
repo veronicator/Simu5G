@@ -44,5 +44,33 @@ cModule *AvailableResourcesSelectionBased::findBestMecHost(const ApplicationDesc
     return bestHost;
 }
 
+cModule *AvailableResourcesSelectionBased::findBestTargetMecHost(const ApplicationDescriptor& appDesc, std::vector<cModule *> eligibleTargetMecHosts) {
+    EV << "AvailableResourcesSelectionBased::findBestTargetMecHost - finding best MecHost..." << endl;
+    cModule *bestHost = nullptr;
+    double maxCpuSpeed = -1;
+
+    for (auto mecHost : eligibleTargetMecHosts) {
+        VirtualisationInfrastructureManager *vim = check_and_cast<VirtualisationInfrastructureManager *>(mecHost->getSubmodule("vim"));
+        ResourceDescriptor resources = appDesc.getVirtualResources();
+        bool res = vim->isAllocable(resources.ram, resources.disk, resources.cpu);
+        if (!res) {
+            EV << "AvailableResourcesSelectionBased::findBestTargetMecHost - MEC host [" << mecHost->getName() << "] does not have enough resources. Searching again..." << endl;
+            continue;
+        }
+        if (vim->getAvailableResources().cpu > maxCpuSpeed) {
+            // Temporarily select this mec host as the best
+            EV << "AvailableResourcesSelectionBased::findBestTargetMecHost - MEC host [" << mecHost->getName() << "] temporarily chosen as best MEC host. Available resources: " << endl;
+            vim->printResources();
+            bestHost = mecHost;
+            maxCpuSpeed = vim->getAvailableResources().cpu;
+        }
+    }
+    if (bestHost != nullptr)
+        EV << "AvailableResourcesSelectionBased::findBestTargetMecHost - MEC host [" << bestHost->getName() << "] has been chosen as the best Mec Host" << endl;
+    else
+        EV << "AvailableResourcesSelectionBased::findBestTargetMecHost - No Mec Host found" << endl;
+    return bestHost;
+}
+
 } //namespace
 

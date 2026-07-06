@@ -21,6 +21,7 @@
 #include "nodes/mec/MECOrchestrator/MECOMessages/MECOrchestratorMessages_m.h"
 #include "nodes/mec/VirtualisationInfrastructureManager/VirtualisationInfrastructureManager.h"
 #include "nodes/mec/MECPlatform/ServiceRegistry/ServiceRegistry.h"
+#include "nodes/mec/MECPlatform/MECServices/RNIService/resources/AssociateId.h"
 
 namespace simu5g {
 
@@ -88,8 +89,13 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     bool terminateMEApp(DeleteAppMessage *msg);
     bool terminateEmulatedMEApp(DeleteAppMessage *msg);
 
+    // method called when the mobile MEC host performs the handover, to migrate all MEC apps other MEC hosts (source mepm)
     void migrateMecAppsReq();
-    void migrateMecApp(cMessage *msg);
+    // method to instantiate a migrated MEC app on the target MEC host (trg mepm)
+    void instantiateMigratingMecApp(cMessage *msg);
+    // method to trigger the migration of a MEC app after UE handover
+    // - id Ue performing handover - target mecHost/gNB
+    void triggerMecAppMigration(AssociateId associateId, std::vector<std::string> appInstanceIds, MacNodeId srcEcgi, MacNodeId trgEcgi);
 
     /* stop and remove MecApp instance from the MecHost after migration
      * triggered by a message from MEO*/

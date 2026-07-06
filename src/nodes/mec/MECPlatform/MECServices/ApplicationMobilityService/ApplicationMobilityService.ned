@@ -60,9 +60,6 @@ simple ApplicationMobilityService like IMECService, IApp
     // Socket manager
    	string serverThreadClass = default("simu5g.nodes.mec.MECPlatform.MECServices.MECServiceBase.SocketManager");
 
-    string dataTransferMode @enum("bytecount","object","bytestream") = default("bytestream"); // bytestream for emulation
-
-
     @display("i=block/app");
     @signal[requestQueueSize];
     @statistic[requestQueueSizeStat](title="Request queue size"; source="requestQueueSize"; record=mean,vector);
