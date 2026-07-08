@@ -53,7 +53,7 @@ void ApplicationMobilityService::initialize(int stage)
     MecServiceBase2::initialize(stage);
 
     if (stage == inet::INITSTAGE_APPLICATION_LAYER) {
-        // connect with the RNIS
+        // connect to the RNI service
         cMessage *m = new cMessage("connectRNIS");
         scheduleAt(simTime() + 0.3, m);
     }
@@ -163,7 +163,7 @@ void ApplicationMobilityService::handleGETRequest(const HttpRequestMessage *curr
     else if(uri.find(baseUriServiceRegistration_) == 0)
     {
         uri.erase(0, baseUriServiceRegistration_.length());
-        if(uri.length() > 0 && uri.find("deregister_task") == std::string::npos)
+        if(uri.length() > 0 && uri.find("/deregister_task") == std::string::npos)
         {
             EV << "AMS::Getting specific id " << endl;
 
@@ -523,14 +523,13 @@ void ApplicationMobilityService::handleRnisResponseMessage(const HttpResponseMes
            std::stringstream stream;
            stream << "sub" << jsonBody["subscriptionId"];
            std::string subId_ = stream.str();
-           // todo: salvare il subscriptionId di ogni richiesta (cellChangeSubscription)
+           // todo: save the subId of each subscription request (?)
 
            EV << "ApplicationMobilityService::handling Rnis response - jsonBody: " << jsonBody << endl;
        }
     }
     else if(response->getCode() == 204) {
        EV << "ApplicationMobilityService::handling RNI response - delete subscription ok" << endl;
-    //           responseCounter_--;
     }
     else if(response->getCode() == 400) {
        EV << "ApplicationMobilityService::handling RNI response - bad request" << endl;
@@ -559,17 +558,13 @@ void ApplicationMobilityService::handleSubscriptionRequest(SubscriptionBase *sub
         nlohmann::ordered_json response = subscription->toJson();
         response["subscriptionId"] = subscriptionId_;
         EV << "AMS::subscribed with id " << subscriptionId_ << "\n" << subscription->toJson() << endl;
-        subscriptionId_ ++;
+        subscriptionId_++;
         Http::send201Response(socket, response.dump().c_str());
 
         // TODO Add new parameter in MobilityProcedureSubscription:
         // requestTestNotification - here you can start the test!
 
-        // Debugging
-        std::cout << "ADDED subscription" << endl;
-//        std::cout << "before printing" <<endl;
         printAllSubscriptions();
-//        std::cout << "after printing " << endl;
         EV << serviceName_ << " - correct subscription created!" << endl;
     }
     else
@@ -597,6 +592,7 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
 
         EV << "AMS::CellChangeNotification - srcCellId " << srcEcgi.getCellId() << "; trgCellId " << trgEcgi.getCellId() << endl;
 
+        // more than one mec app instance associate to a single ue could be present
         for (auto instanceId: appInstanceIds)
             registrationInfo.push_back(registrationResources_->getRegistrationInfoFromAppId(instanceId));
 
@@ -609,7 +605,7 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
                 }
 
                 // app mobility allowed
-                for (auto id: associateIds) {
+                for (auto id: associateIds) {   // in our simple case, associateIds is a vector with a single element
                     if (devInfo.getAssociateId().getValue().compare(id.getValue()) == 0) {
                         EV << "AMS::CellChangeNotification - trigger migration" << endl;
                         mecPlatformManager_->triggerMecAppMigration(id, appInstanceIds, srcEcgi.getCellId(), trgEcgi.getCellId());

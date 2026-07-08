@@ -740,8 +740,6 @@ void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
      }
      else {
          appInfo->endPoint = mepmMsg->getEndPoint();
-//         appInfo->endPoint.addr = inet::L3Address(mepmMsg->getEndPointAddr());
-//         appInfo->endPoint.port = mepmMsg->getEndPointPort();
          appInfo->instanceId = mepmMsg->getInstanceId();
          appInfo->reference = getSimulation()->getModule(mepmMsg->getModuleId());
          tmpMecApp.isEmulated = false;
@@ -812,7 +810,7 @@ void MecOrchestrator::sendMigrateAppContext(bool result, int ueAppId, int contex
 
     send(migrateMsg, "toUALCMP");
 
-    // next work: manage the case of multi-ue for a single mec app instance -> remove only if not used anymore
+    // future work: manage the case of multi-ue for a single mec app instance -> remove old mec app instance only if not used anymore
     MECOrchestratorMessage *deleteAppMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
     deleteAppMsg->setType(STOP_MIGRATED_INSTANCE_APP);
     deleteAppMsg->setContextId(contextId);
@@ -897,15 +895,15 @@ void MecOrchestrator::getCellMecHostsConnections() {
             const char *token = bsList->get(i).stringValue();
             cModule *bsModule = getSimulation()->getModuleByPath(token);
             CellInfo *cellInfo = check_and_cast<CellInfo *>(bsModule->getSubmodule("cellInfo"));
-            // todo: insert/add the mechost to each corresponding cell
+            // insert the mec host in the vector of each corresponding cell -> for each cell there'll be a vector of all associate mec hosts
             cellToMecHosts[cellInfo->getMacCellId()].push_back(mecHostModule);
             EV << "MecOrchestrator::getCellMecHostsConnections - cellToMecHosts: " << cellInfo->getMacCellId() << endl;
         }
     }
 
+    // debug
     for (auto cell: cellToMecHosts) {
         for (auto mecHost: cell.second) {
-
             EV << "MecOrchestrator::getCellMecHostsConnections - cellToMecHosts: " << cell.first << " - mecHost: " << mecHost->getFullName() << endl;
         }
     }

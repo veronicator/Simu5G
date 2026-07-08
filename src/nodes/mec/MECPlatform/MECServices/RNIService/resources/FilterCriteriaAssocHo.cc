@@ -97,20 +97,17 @@ void FilterCriteriaAssocHo::setFilterCriteriaValueFromJson(const nlohmann::order
         associateId_.push_back(a);
     }
 
-    if(!json.contains("hoStatus"))
-    {
+    if(!json.contains("hoStatus")) {
        hoStatus_.push_back(getHoStatusFromString("COMPLETED")); // default value
     }
-    else
-    {
+    else {
         for(auto &val : json["hoStatus"].items()){
            nlohmann::ordered_json hoStatusString = val.value();
            hoStatus_.push_back(getHoStatusFromString(hoStatusString));
         }
     }
 
-    if(json.contains("ecgi"))
-    {
+    if(json.contains("ecgi")) {
         for(auto &val : json["ecgi"].items()){
            nlohmann::ordered_json ecgi = val.value();
            Ecgi e;

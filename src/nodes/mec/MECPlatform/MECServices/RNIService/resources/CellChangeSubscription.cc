@@ -84,8 +84,7 @@ bool CellChangeSubscription::fromJson(const nlohmann::ordered_json& json)
     
     if (json.contains("callbackReference")) {
         std::string callbackReference = json["callbackReference"];
-        // parse it to retrieve the resource uri and
-        // the host
+        // parse it to retrieve the resource uri and the host
         std::size_t found = callbackReference.find("/");
         if (found != std::string::npos) {
             clientHost_ = callbackReference.substr(0, found);
