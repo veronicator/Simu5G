@@ -116,7 +116,6 @@ void ApplicationMobilityService::handleMessage(cMessage *msg)
                     EV << "ApplicationMobilityService::connectRNIS - mec serv: " << service.getName() << endl;
                     if (service.getName() == "RNIService") {
                         rnisInfo = service.toJson();
-//                        tmpRnis = service.ServiceInfo();
                         if (service.getMecHost() == meHost_->getName())
                             break;
                     }
@@ -235,6 +234,7 @@ void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *cur
         registrationResources_->addRegistrationInfo(regInfo);
 
         applicationServiceIds++;
+
         nlohmann::ordered_json response = regInfo->toJson();
         std::pair<std::string, std::string> p("Location: ", baseUriServiceRegistration_);
         EV << "AMS::Correctly subscribed sending: " << response.dump() <<endl;
@@ -242,27 +242,24 @@ void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *cur
 
         if (rnisSocket_ != nullptr) {
             // send RNIS CellChangeSubscription
-            std::string uristring = "/example/rni/v2/subscriptions";
-            std::string host = rnisSocket_->getRemoteAddress().str()+":"+std::to_string(rnisSocket_->getRemotePort());
+            sendCellChangeSubscription(regInfo->getDeviceInformation()[0].getAssociateId());
 
-            nlohmann::ordered_json subscriptionBody_;
-            subscriptionBody_ = nlohmann::ordered_json();
-            subscriptionBody_["subscriptionType"] = "CellChangeSubscription";
-            inet::L3Address localAddress = inet::L3AddressResolver().resolve(getParentModule()->getParentModule()->getFullPath().c_str());
-            EV << "ApplicationMobilityService::handlePOSTRequest - send RNIS CellChangeSubscription - localAddress: " << localAddress << endl;
-            subscriptionBody_["callbackReference"] =  localAddress.str() + ":" + std::to_string(par("localPort").intValue()) + callbackUri_;
-            EV << "ApplicationMobilityService::handlePOSTRequest - send RNIS CellChangeSubscription - callbackReference: " << subscriptionBody_["callbackReference"] << endl;
-            // subscriptionBody_["websockNotifConfig"] =
-            subscriptionBody_["filterCriteriaAssocHo"]["appInstanceId"] = getName();
-            subscriptionBody_["filterCriteriaAssocHo"]["associateId"] = nlohmann::ordered_json::array();
-
-            subscriptionBody_["filterCriteriaAssocHo"]["associateId"].push_back(regInfo->getDeviceInformation()[0].getAssociateId().toJson());   //.push_back(ueId.toJson());
-            subscriptionBody_["filterCriteriaAssocHo"]["hoStatus"] = nlohmann::ordered_json::array();
-            subscriptionBody_["filterCriteriaAssocHo"]["hoStatus"].push_back(hoStatusString[IN_PREPARATION]);
-            // subscriptionBody_["filterCriteriaAssocHo"]["ecgi"] = nlohmann::ordered_json::array();
-            subscriptionBody_["requestTestNotification"] = false;
-
-            Http::sendPostRequest(rnisSocket_, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
+        }
+        // if the registration request comes from a mecApp on a mobileMecHost -> subscribe to HostMobilityNotification
+        if (regInfo->getMobileMecHost()) {  // is mobile
+            bool hmsConnected = false;
+            for (auto sockId: sockIdToMecHost) {
+                if (sockId.second == regInfo->getMecHostName()) {
+                    hmsConnected = true;
+//                    sendHostMobilitySubscription();
+                    break;
+                }
+            }
+            if (!hmsConnected)
+                connectToHms(regInfo->getMecHostName());
+//            todo: if connected: send subscription
+////            sendHostMobilitySubscription();
+//            }
         }
     }
     else if(uri.compare(baseUriSubscriptions_) == 0) {
@@ -462,13 +459,68 @@ void ApplicationMobilityService::socketDataArrived(inet::TcpSocket *socket, inet
             queue.push(chunk);
 
             while (queue.has<HttpBaseMessage>(b(-1))) {
-                EV << "ApplicationMobilityService::socketDataArrived - rnisSocket - while " << endl;
                 auto baseMsg = queue.pop<HttpBaseMessage>(b(-1));
                 handleRnisMessage(new Packet("RnisMessage", baseMsg));
             }
         }
     }
+    else {
+        int sockId = socket->getSocketId();
+        if (sockIdToMecHost.find(sockId) != sockIdToMecHost.end()) {
+            EV << "ApplicationMobilityService::socketDataArrived - hmsSocket" << endl;
+
+            if (msg->getKind() == TCP_I_DATA || msg->getKind() == TCP_I_URGENT_DATA) {
+                inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
+                int connId = socket->getSocketId();
+                ChunkQueue& queue = socketQueue[connId];
+                auto chunk = packet->peekDataAt(B(0), packet->getTotalLength());
+                queue.push(chunk);
+
+                while (queue.has<HttpBaseMessage>(b(-1))) {
+                    auto baseMsg = queue.pop<HttpBaseMessage>(b(-1));
+                    // todo
+    //                handleHmsMessage(new Packet("HmsMessage", baseMsg), socket);
+                }
+            }
+        }
+    }
     delete msg;
+}
+
+void ApplicationMobilityService::connectToHms(std::string mecHostName) {
+    if (mecPlatformManager_ != nullptr) {
+        auto mecServices = mecPlatformManager_->getAvailableMecServices();
+        nlohmann::json hmsInfo;
+        for (const auto& service : *mecServices) {
+            EV << "ApplicationMobilityService::connectToHms - mec serv: " << service.getName() << endl;
+            if (service.getName() == "HostMobilityService") {
+                if (service.getMecHost() == mecHostName) {
+                    // ams needs to connect to hms in the serving mobile mec host
+                    hmsInfo = service.toJson();
+                    break;
+                }
+            }
+        }
+        if (!hmsInfo.empty()) {
+            inet::TcpSocket *hmsSocket = new TcpSocket();
+            hmsSocket->setOutputGate(gate("socketOut"));
+            hmsSocket->setCallback(this);
+            socketMap.addSocket(hmsSocket);
+            sockIdToMecHost.insert({hmsSocket->getSocketId(), mecHostName});
+
+            std::string address = hmsInfo["transportInfo"]["endPoint"]["addresses"]["host"];
+            inet::L3Address hmsAddr = L3AddressResolver().resolve(address.c_str());
+            EV << "ApplicationMobilityService::connectToHms - hmsInfo addr: " << address << " port: " << hmsInfo["transportInfo"]["endPoint"]["addresses"]["port"] << endl;
+            hmsSocket->connect(hmsAddr, hmsInfo["transportInfo"]["endPoint"]["addresses"]["port"]);
+
+        }
+        else {
+            EV << "ApplicationMobilityService::connectToHms - HostMobilityService not found" << endl;
+
+        }
+    }
+    else
+        EV << "ApplicationMobilityService::handleMessage - mecPlatformManager_ is null " << endl;
 }
 
 void ApplicationMobilityService::handleRnisMessage(cMessage *msg) {
@@ -513,7 +565,7 @@ void ApplicationMobilityService::handleRnisResponseMessage(const HttpResponseMes
 
     EV_DEBUG << "Message body: " << endl << response->getBody() << endl;
 
-    // Manage subscription response and polling
+    // Manage subscription response
     EV << "ApplicationMobilityService::handling Rnis response" << endl;
     if(response->getCode() == 201) {
        EV << "ApplicationMobilityService::handling RNI response - subscription ok: " << response->getBody() << endl;
@@ -574,6 +626,30 @@ void ApplicationMobilityService::handleSubscriptionRequest(SubscriptionBase *sub
     }
 }
 
+void ApplicationMobilityService::sendCellChangeSubscription(AssociateId associateId) {
+    // send RNIS CellChangeSubscription
+     std::string uristring = "/example/rni/v2/subscriptions";
+     std::string host = rnisSocket_->getRemoteAddress().str()+":"+std::to_string(rnisSocket_->getRemotePort());
+
+     nlohmann::ordered_json subscriptionBody_;
+     subscriptionBody_ = nlohmann::ordered_json();
+     subscriptionBody_["subscriptionType"] = "CellChangeSubscription";
+     inet::L3Address localAddress = inet::L3AddressResolver().resolve(meHost_->getFullPath().c_str());
+     EV << "ApplicationMobilityService::handlePOSTRequest - send RNIS CellChangeSubscription - localAddress: " << localAddress << endl;
+     subscriptionBody_["callbackReference"] =  localAddress.str() + ":" + std::to_string(par("localPort").intValue()) + callbackUri_;
+     EV_DEBUG << "ApplicationMobilityService::handlePOSTRequest - send RNIS CellChangeSubscription - callbackReference: " << subscriptionBody_["callbackReference"] << endl;
+     subscriptionBody_["filterCriteriaAssocHo"]["appInstanceId"] = getName();
+     subscriptionBody_["filterCriteriaAssocHo"]["associateId"] = nlohmann::ordered_json::array();
+
+     subscriptionBody_["filterCriteriaAssocHo"]["associateId"].push_back(associateId.toJson());
+     subscriptionBody_["filterCriteriaAssocHo"]["hoStatus"] = nlohmann::ordered_json::array();
+     subscriptionBody_["filterCriteriaAssocHo"]["hoStatus"].push_back(hoStatusString[IN_PREPARATION]);
+     // subscriptionBody_["filterCriteriaAssocHo"]["ecgi"] = nlohmann::ordered_json::array();
+     subscriptionBody_["requestTestNotification"] = false;
+
+     Http::sendPostRequest(rnisSocket_, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
+}
+
 // trigger mec App migration sending a message to MEO through MEPM
 void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::ordered_json& request) {
 
@@ -598,7 +674,6 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
 
         for (auto regInfo: registrationInfo) {
             for (auto devInfo: regInfo->getDeviceInformation()) {
-            EV << "AMS::CellChangeNotification - for - registrationInfo - deviceInfo" << endl;
                 if (devInfo.getAppMobilityServiceLevelString() == "APP_MOBILITY_NOT_ALLOWED") {
                     EV << "AMS::CellChangeNotification - APP_MOBILITY_NOT_ALLOWED" << endl;
                     continue;

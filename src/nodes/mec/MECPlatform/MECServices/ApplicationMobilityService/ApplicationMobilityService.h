@@ -61,8 +61,11 @@ class ApplicationMobilityService : public MecServiceBase2
   int migrationCounter_;
   simsignal_t totalMigrationsSignal_;
 
-//  // socket to communicate with RNIS
+  // socket to communicate with RNIS
   inet::TcpSocket *rnisSocket_ = nullptr;
+  // socket to communicate with HMS
+//  inet::TcpSocket *hmsSocket_ = nullptr;
+  std::map<int, std::string> sockIdToMecHost;   // socketId-mecHostName
 
   protected:
     std::map<int, inet::ChunkQueue> socketQueue;
@@ -83,6 +86,8 @@ class ApplicationMobilityService : public MecServiceBase2
 
     void socketDataArrived(inet::TcpSocket *socket, inet::Packet *packet, bool urgent) override;
 
+    void connectToHms(std::string mecHostName);
+
     void handleRnisMessage(cMessage *msg);
     void handleRnisRequestMessage(const HttpRequestMessage *msg);
     void handleRnisResponseMessage(const HttpResponseMessage *msg);
@@ -91,7 +96,7 @@ class ApplicationMobilityService : public MecServiceBase2
     void handleCellChangeNotification(const nlohmann::ordered_json& request);
     void handleNotificationCallback(const nlohmann::ordered_json& request);
 
-    void sendCellChangeSubscription();
+    void sendCellChangeSubscription(AssociateId associateId);
 
     /*
      * This method is called for every element in the subscriptions_ queue.

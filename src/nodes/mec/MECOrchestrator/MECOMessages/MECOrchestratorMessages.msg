@@ -44,7 +44,7 @@ message MECOrchestratorMessage {
     bool success;   
 }
 
-class MECAppMessage extends inet::FieldsChunk {
+class MECMessage extends inet::FieldsChunk {
     chunkLength = inet::B(8);
         
     //type of message
@@ -52,7 +52,7 @@ class MECAppMessage extends inet::FieldsChunk {
     
 }
 
-class CreateAppMessage extends MECAppMessage {
+class CreateAppMessage extends MECMessage {
 
     unsigned int sno;
     simtime_t timestamp;
@@ -85,7 +85,7 @@ class CreateAppMessage extends MECAppMessage {
     
 }
 
-class DeleteAppMessage extends MECAppMessage {
+class DeleteAppMessage extends MECMessage {
    
     unsigned int sno;
     simtime_t timestamp;
@@ -115,7 +115,7 @@ class DeleteAppMessage extends MECAppMessage {
     string requiredService;
 }
 
-class MigrateAppMessage extends MECAppMessage {
+class MigrateAppMessage extends MECMessage {
     
    	int mepmId;
    	string mepmAddress;
@@ -127,7 +127,7 @@ class MigrateAppMessage extends MECAppMessage {
     
 }
 
-class MigrateAppAckMessage extends MECAppMessage {
+class MigrateAppAckMessage extends MECMessage {
     
    	int mepmId;
    	string mepmAddress;
@@ -146,7 +146,7 @@ class MigrateAppAckMessage extends MECAppMessage {
     
 }
 
-class TriggerMigrationAppMessage extends MECAppMessage {
+class TriggerMigrationAppMessage extends MECMessage {
     // msg type: MIGRATE_MEAPP
    	
    	AssociateId associateId;	// type, value

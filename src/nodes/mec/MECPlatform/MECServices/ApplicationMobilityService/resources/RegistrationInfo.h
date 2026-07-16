@@ -39,11 +39,17 @@ class RegistrationInfo : public AttributeBase{
     std::vector<DeviceInformation> deviceInformation;
     int expiryTime; // not mandatory
     ServiceConsumerId serviceConsumerId;
+    // extended fields for HMS supporting - NOT in ETSI specifications
+    bool mobileMecHost;
+    std::string mecHostAddress;
+    std::string mecHostName;
+
 
   public:
     RegistrationInfo();
     RegistrationInfo(ServiceConsumerId scId);
     RegistrationInfo(ServiceConsumerId scId, std::string appMobSId, std::vector<DeviceInformation>  devInfo, int exTime);
+    RegistrationInfo(ServiceConsumerId scId, std::string appMobSId, std::vector<DeviceInformation>  devInfo, int exTime, bool mobile, std::string hostAddr, std::string hostName);
     virtual ~RegistrationInfo();
 
     virtual nlohmann::ordered_json toJson() const override;
@@ -58,6 +64,10 @@ class RegistrationInfo : public AttributeBase{
     std::vector<DeviceInformation> getDeviceInformation() const {return deviceInformation;}
     int getExpiryTime() const {return expiryTime;}
     ServiceConsumerId getServiceConsumerId() const {return serviceConsumerId;}
+
+    bool getMobileMecHost() const { return mobileMecHost; }
+    std::string getMecHostAddress() const { return mecHostAddress; }
+    std::string getMecHostName() const { return mecHostName; }
 
     void printRegistrationInfo();
 

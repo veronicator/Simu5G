@@ -125,6 +125,10 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     cQueue serviceHttpMessages_;
     cQueue mp1HttpMessages_;
 
+    // HMS
+    bool mobileMecHost = false;
+    opp_component_ptr<cModule> mecHost;
+
     inet::ModuleRefByPar<VirtualisationInfrastructureManager> vim;
 
     cMessage *sendTimer = nullptr;

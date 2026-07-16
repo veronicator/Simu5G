@@ -59,8 +59,13 @@ void MecAppBase::initialize(int stage)
 
     mp1Socket_ = addNewSocket();
 
+    // hms
+    mecHost = getParentModule();
+    if (mecHost->hasPar("isMobile"))
+        mobileMecHost = mecHost->par("isMobile").boolValue();    // true if the mec app instance is on a mobile mec host
 
-    mobilityAware_ = par("mobilityAware").boolValue();
+
+    mobilityAware_ = par("mobilityAware").boolValue();  // true if the mec app can be subject to migration
 
     if (mobilityAware_) {
         mecServices[AMS] = new MecServiceSocketInfo;
@@ -73,7 +78,7 @@ void MecAppBase::initialize(int stage)
     scheduleAt(simTime() + 0, msg);
 
     processMessage_ = new cMessage("processedMessage");
-    // AMS
+    // AMS/HMS
     localAddress = L3AddressResolver().resolve(getParentModule()->getFullPath().c_str());
 
     responsecounter = 0;
@@ -417,7 +422,6 @@ void MecAppBase::sendAmsRegistration(cMessage *msg)
     registrationBody["deviceInformation"] = nlohmann::json::array();
 
 //    if(!ueAppAddress_.isUnspecified() && ueAppPort_ > 0){
-//        EV << "MecAppBase::sendAmsRegistration - ueAppAddress"<< endl;
         nlohmann::ordered_json deviceInformation;
         nlohmann::ordered_json associateId;
 
@@ -431,6 +435,11 @@ void MecAppBase::sendAmsRegistration(cMessage *msg)
 
         registrationBody["deviceInformation"].push_back(deviceInformation);
 //    }
+
+
+    registrationBody["mobileMecHost"] = mobileMecHost;
+    registrationBody["mecHostAddress"] = localAddress.str();
+    registrationBody["mecHostName"] = mecHost->getName();
 
     EV << "Registration with body" << registrationBody.dump().c_str() << endl;
     std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());

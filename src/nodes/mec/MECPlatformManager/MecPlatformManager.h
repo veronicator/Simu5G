@@ -19,6 +19,8 @@
 #include "common/LteCommon.h"
 #include "nodes/mec/utils/MecCommon.h"
 #include "nodes/mec/MECOrchestrator/MECOMessages/MECOrchestratorMessages_m.h"
+#include "nodes/mec/MECPlatform/MecServiceMessages_m.h"
+#include "nodes/mec/MECPlatform/MecServiceMessage_Types.h"
 #include "nodes/mec/VirtualisationInfrastructureManager/VirtualisationInfrastructureManager.h"
 #include "nodes/mec/MECPlatform/ServiceRegistry/ServiceRegistry.h"
 #include "nodes/mec/MECPlatform/MECServices/RNIService/resources/AssociateId.h"
@@ -37,6 +39,7 @@ using namespace omnetpp;
 
 class ServiceRegistry;
 class MecOrchestrator;
+class HostMobilityService;
 
 class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallback
 {
@@ -44,6 +47,8 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     inet::ModuleRefByPar<MecOrchestrator> mecOrchestrator;
     inet::ModuleRefByPar<VirtualisationInfrastructureManager> vim;
     inet::ModuleRefByPar<ServiceRegistry> serviceRegistry;
+
+    HostMobilityService *hms = nullptr;;
 
     inet::L3Address mepmAddress_;
 
@@ -106,8 +111,19 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     /*
      * method called by the MEC service to notify its presence to the MEC system
      */
-
     void registerMecService(ServiceDescriptor&) const;
+
+    // HMS
+    /*
+     * method called by the HMS to register its reference ptr to mepm
+     */
+    void registerHostMobilityService(HostMobilityService *mecService) { hms = mecService; }
+
+    /*
+     * method to update the serving area of the mobile MEC host performing the handover
+     */
+    void updateServigArea(std::string mecHostName, MacNodeId srcCell, MacNodeId trgCell);
+    void manageUpdateServingAreaResponse(cMessage *msg);
 
     inet::L3Address getMepmAddress() {
         return mepmAddress_;

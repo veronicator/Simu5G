@@ -9,6 +9,7 @@
 // and cannot be removed from it.
 //
 
+#include "nodes/mec/MECPlatform/MECServices/HostMobilityService/HostMobilityService.h"
 #include "nodes/mec/MECPlatformManager/MecPlatformManager.h"
 #include "nodes/mec/MECOrchestrator/MecOrchestrator.h"
 
@@ -95,32 +96,22 @@ void MecPlatformManager::socketDataArrived(inet::TcpSocket *socket, inet::Packet
         auto chunk = packet->peekDataAt(B(0), packet->getTotalLength());
         queue.push(chunk);
 
-        while (queue.has<MECAppMessage>(b(-1))) {
-            auto meoMsg = queue.pop<MECAppMessage>(b(-1));
-//            auto meMsg = msg->peekAtFront<MECAppMessage>();
+        while (queue.has<MECMessage>(b(-1))) {
+            auto meoMsg = queue.pop<MECMessage>(b(-1));
+//            auto meMsg = msg->peekAtFront<MECMessage>();
             if (!strcmp(meoMsg->getType(), MIGRATE_MEAPP))
                 instantiateMigratingMecApp(new Packet("CreateAppMessage", meoMsg));
              else if (!strcmp(meoMsg->getType(), STOP_MIGRATED_MEAPP))
                 stopMigratedMecApp(new Packet("DeleteAppMessage", meoMsg));
             /*  // todo gestire casi start / stop
             */
+             else if (!strcmp(meoMsg->getType(), ACK_UPDATE_SERVING_AREA))
+                 manageUpdateServingAreaResponse(new Packet("UpdateServingAreaResponse", meoMsg));
             else
                 EV << "MecPlatformManager::socketDataArrived - Unexpected type data: " << meoMsg->getType() << endl;
         }
     }
 }
-
-
-//void MecPlatformManager::socketPeerClosed(inet::TcpSocket *socket)
-//{
-//    EV << "MecPlatformManager::socketPeerClosed" << endl;
-//    if (meoSocket_.getState() == inet::TcpSocket::PEER_CLOSED) {
-//        EV_INFO << "remote TCP closed, closing here as well\n";
-//        meoSocket_.close();
-//    }
-//}
-
-
 
 // instancing the requested MECApp (called by handleResource)
 MecAppInstanceInfo *MecPlatformManager::instantiateMEApp(CreateAppMessage *msg)
@@ -262,6 +253,44 @@ void MecPlatformManager::registerMecService(ServiceDescriptor& serviceDescriptor
 {
     if (mecOrchestrator != nullptr)
         mecOrchestrator->registerMecService(serviceDescriptor);
+}
+
+void MecPlatformManager::updateServigArea(std::string mecHostName, MacNodeId srcCell, MacNodeId trgCell) {
+    Enter_Method_Silent("MecPlatformManager::updateServigArea");
+
+    EV << "MecPlatformManager::updateServigArea" << endl;
+
+    auto updateMsg = inet::makeShared<UpdateServingAreaMessage>();
+    updateMsg->setType(UPDATE_SERVING_AREA);
+    updateMsg->setMecHostName(mecHostName.c_str());
+    updateMsg->setMepmAddress(mepmAddress_);
+    updateMsg->setSrcCellId(srcCell);
+    updateMsg->setTrgCellId(trgCell);
+    inet::B msgSize = inet::B(40 + strlen(updateMsg->getType()) + strlen(mecHostName.c_str())
+            + strlen(mepmAddress_.str().c_str()));
+    updateMsg->setChunkLength(msgSize);
+
+    inet::Packet *newPkt = new inet::Packet("UpdateServingAreaMessage");
+    newPkt->insertAtBack(updateMsg);
+    meoSocket_.send(newPkt);
+}
+
+void MecPlatformManager::manageUpdateServingAreaResponse(cMessage *msg) {
+    Enter_Method_Silent("MecPlatformManager::manageUpdateResponse");
+
+    EV << "MecPlatformManager::manageUpdateResponse" << endl;
+
+    inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
+    auto responseMsg = pkt->removeAtFront<UpdateServingAreaResponse>();
+
+    EV << "MecPlatformManager::manageUpdateServingAreaResponse -> "  << responseMsg->getResponse() << endl;
+
+    if(responseMsg->getStatus()) {
+        // update serving area ok
+        // notify the correct update to HMS
+        if (hms != nullptr)
+            hms->handleHostMobilityUpdate();
+    }
 }
 
 } //namespace

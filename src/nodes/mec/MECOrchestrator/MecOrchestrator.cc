@@ -163,8 +163,8 @@ void MecOrchestrator::socketDataArrived(inet::TcpSocket *socket, inet::Packet *m
         auto chunk = packet->peekDataAt(B(0), packet->getTotalLength());
         queue.push(chunk);
 
-        while (queue.has<MECAppMessage>(b(-1))) {
-            auto mepmMsg = queue.pop<MECAppMessage>(b(-1));
+        while (queue.has<MECMessage>(b(-1))) {
+            auto mepmMsg = queue.pop<MECMessage>(b(-1));
             // from mepm -> migrateMsg
             if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPPS_REQ)) {
                 migrateAllMecApps(new Packet("MigrateAppMessage", mepmMsg));
@@ -174,6 +174,9 @@ void MecOrchestrator::socketDataArrived(inet::TcpSocket *socket, inet::Packet *m
 
             else if (!strcmp(mepmMsg->getType(), ACK_MIGRATE_MEAPP))
                 handleMigrateAppAck(new Packet("MigrateAppAckMessage", mepmMsg));
+
+            else if (!strcmp(mepmMsg->getType(), UPDATE_SERVING_AREA))
+                updateMecHostServingArea(new Packet("UpdateServingAreaMessage", mepmMsg));
             else
                 EV << "MecOrchestrator::socketDataArrived - Unexpected type data: " << mepmMsg->getType() << endl;
         }
@@ -897,14 +900,14 @@ void MecOrchestrator::getCellMecHostsConnections() {
             CellInfo *cellInfo = check_and_cast<CellInfo *>(bsModule->getSubmodule("cellInfo"));
             // insert the mec host in the vector of each corresponding cell -> for each cell there'll be a vector of all associate mec hosts
             cellToMecHosts[cellInfo->getMacCellId()].push_back(mecHostModule);
-            EV << "MecOrchestrator::getCellMecHostsConnections - cellToMecHosts: " << cellInfo->getMacCellId() << endl;
+            EV_DEBUG << "MecOrchestrator::getCellMecHostsConnections - cellToMecHosts - cell: " << cellInfo->getMacCellId() << " - " << binder_->getModuleByMacNodeId(cellInfo->getMacCellId())->getName() << endl;
         }
     }
 
     // debug
     for (auto cell: cellToMecHosts) {
         for (auto mecHost: cell.second) {
-            EV << "MecOrchestrator::getCellMecHostsConnections - cellToMecHosts: " << cell.first << " - mecHost: " << mecHost->getFullName() << endl;
+            EV_DEBUG << "MecOrchestrator::getCellMecHostsConnections - cellToMecHosts - cell: " << cell.first << " - mecHost: " << mecHost->getFullName() << endl;
         }
     }
 }
@@ -934,6 +937,62 @@ void MecOrchestrator::registerMecService(ServiceDescriptor& serviceDescriptor) c
             serviceRegistry->registerMecService(serviceDescriptor);
         }
     }
+}
+
+void MecOrchestrator::updateMecHostServingArea(cMessage *msg) {
+    EV << "MecOrchestrator::updateMecHostServingArea" << endl;
+
+    inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
+    auto mepmMsg = pkt->peekAtFront<UpdateServingAreaMessage>();
+
+    const char *mecHostName = mepmMsg->getMecHostName();
+    MacNodeId srcCell = mepmMsg->getSrcCellId();
+    MacNodeId trgCell = mepmMsg->getTrgCellId();
+
+    cModule *mecHostModule = getSimulation()->getModuleByPath(mecHostName);
+
+    // remove mecHost module reference from source cell mecHost list
+    auto it = std::find(cellToMecHosts[srcCell].begin(), cellToMecHosts[srcCell].end(), opp_component_ptr<cModule>(mecHostModule));
+    if (it != cellToMecHosts[srcCell].end())
+        cellToMecHosts[srcCell].erase(it);
+
+    // create response message
+    auto responseMsg = inet::makeShared<UpdateServingAreaResponse>();
+    responseMsg->setType(ACK_UPDATE_SERVING_AREA);
+    responseMsg->setMecHostName(mecHostName);
+    responseMsg->setMepmAddress(mepmMsg->getMepmAddress());
+    responseMsg->setSrcCellId(srcCell);
+    responseMsg->setTrgCellId(trgCell);
+
+    auto itTrg = std::find(cellToMecHosts[trgCell].begin(), cellToMecHosts[trgCell].end(), opp_component_ptr<cModule>(mecHostModule));
+    if (itTrg != cellToMecHosts[trgCell].end()) {
+        // target cell coverage area is already associated to this mecHost
+        // -> same serving area, no update
+        // NOTE: this should not happen because the HMS/mecHost checks his serving area before request the update
+        responseMsg->setStatus(false);
+        responseMsg->setResponse("The MEC host already serves the target cell coverage area");
+    }
+    else {
+        // add mecHost module reference to target cell mecHost list
+        cellToMecHosts[trgCell].push_back(mecHostModule);
+
+        responseMsg->setStatus(true);
+        responseMsg->setResponse("The MecHost-cells mapping has been updated");
+    }
+
+    // send response msg to mepm
+    inet::B msgSize = inet::B(40 + strlen(responseMsg->getType()) + strlen(mecHostName)
+           + strlen(mepmMsg->getMepmAddress().str().c_str()) + strlen(responseMsg->getResponse()));
+    responseMsg->setChunkLength(msgSize);
+
+    inet::Packet *newPkt = new inet::Packet("UpdateServingAreaResponse");
+    newPkt->insertAtBack(responseMsg);
+
+    inet::L3Address mepmAddress = mepmMsg->getMepmAddress();
+    int sockId = mepmSockets_[mepmAddress];
+    inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(sockets_.getSocketById(sockId));
+
+    socket->send(newPkt);
 }
 
 void MecOrchestrator::onboardApplicationPackages()

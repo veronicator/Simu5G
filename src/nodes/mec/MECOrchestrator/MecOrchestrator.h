@@ -24,6 +24,8 @@
 #include "nodes/mec/MECOrchestrator/MECOMessages/MECOrchestratorMessages_m.h"
 #include "nodes/mec/MECPlatform/MEAppPacket_m.h"
 #include "nodes/mec/MECPlatform/MEAppPacket_Types.h"
+#include "nodes/mec/MECPlatform/MecServiceMessages_m.h"
+#include "nodes/mec/MECPlatform/MecServiceMessage_Types.h"
 #include "nodes/mec/MECPlatform/MECServices/MECServiceBase/MecServiceBase.h"
 #include "nodes/mec/utils/MecCommon.h"
 
@@ -184,6 +186,11 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
      * This method gets the mapping between each base station and all associated Mec Hosts
      */
     void getCellMecHostsConnections();
+
+    /*
+     * This method update the mapping between mec host and cells
+     */
+    void updateMecHostServingArea(cMessage *msg);
 
     /*
      * The list of the MEC app descriptor to be onboarded at initialization time is

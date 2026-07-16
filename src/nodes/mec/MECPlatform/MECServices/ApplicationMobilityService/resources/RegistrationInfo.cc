@@ -30,10 +30,19 @@ RegistrationInfo::RegistrationInfo(ServiceConsumerId scId)
 
 RegistrationInfo::RegistrationInfo(ServiceConsumerId scId, std::string appMobSId, std::vector<DeviceInformation>devInfo, int exTime)
 {
+    RegistrationInfo(scId, appMobSId, devInfo, exTime, false, nullptr, nullptr);
+}
+
+RegistrationInfo::RegistrationInfo(ServiceConsumerId scId, std::string appMobSId, std::vector<DeviceInformation>devInfo, int exTime,
+        bool mobile, std::string hostAddr, std::string hostName)
+{
     serviceConsumerId = scId;
     appMobilityServiceId = appMobSId;
     deviceInformation = devInfo;
     expiryTime = exTime;
+    mobileMecHost = mobile;
+    mecHostAddress = hostAddr;
+    mecHostName = hostName;
 }
 
 RegistrationInfo::~RegistrationInfo() {
@@ -57,6 +66,9 @@ nlohmann::ordered_json RegistrationInfo::toJson() const
     val["expireTime"] = expiryTime;
     val["serviceConsumerId"]["appInstanceId"] = serviceConsumerId.appInstanceId;
     val["serviceConsumerId"]["mepId"] = serviceConsumerId.mepId;
+    val["mobileMecHost"] = mobileMecHost;
+    val["mecHostAddress"] = mecHostAddress;
+    val["mecHostName"] = mecHostName;
     return val;
 }
 
@@ -105,14 +117,25 @@ bool RegistrationInfo::fromJson(const nlohmann::ordered_json& object)
         deviceInformation.push_back(devInfo);
     }
 
+    if(object.contains("mobileMecHost"))
+        mobileMecHost = object["mobileMecHost"];
+    else
+        mobileMecHost = false;
 
+    if(object.contains("mecHostAddress"))
+        mecHostAddress = object["mecHostAddress"];
+    else
+        mecHostAddress = nullptr;
+
+    if(object.contains("mecHostName"))
+        mecHostName = object["mecHostName"];
+    else
+        mecHostName = nullptr;
 
     // ExpiryTime not mandatory
     expiryTime = 0;
     if(object.contains("expireTime"))
        expiryTime = object["expireTime"];
-
-
 
     serviceConsumerId.appInstanceId = object["serviceConsumerId"]["appInstanceId"];
     serviceConsumerId.mepId = object["serviceConsumerId"]["mepId"];
