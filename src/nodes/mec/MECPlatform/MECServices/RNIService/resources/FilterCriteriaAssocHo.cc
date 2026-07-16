@@ -88,7 +88,8 @@ void FilterCriteriaAssocHo::setFilterCriteriaValueFromJson(const nlohmann::order
 {
     EV << "FilterCriteriaAssocHo::Building FilterCriteriaAssocHo attribute from json - " << json << endl;
 
-    appInstanceId_ = json["appInstanceId"];
+    if (json.contains("appInstanceId"))
+        appInstanceId_ = json["appInstanceId"];
     for(auto &val : json["associateId"].items()){
         nlohmann::ordered_json associateId = val.value();
         AssociateId a;

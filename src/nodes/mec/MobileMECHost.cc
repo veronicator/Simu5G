@@ -36,7 +36,7 @@ void MobileMECHost::initialize(int stage)
     }
 }
 
-void MobileMECHost::receiveSignal(cComponent *source, simsignal_t signalID, intval_t value, cObject *)
+void MobileMECHost::receiveSignal(cComponent *source, simsignal_t signalID, intval_t value, cObject *details)
 {
     if (hasPar("isMobilityAware")) {
         isMobilityAware = par("isMobilityAware").boolValue();

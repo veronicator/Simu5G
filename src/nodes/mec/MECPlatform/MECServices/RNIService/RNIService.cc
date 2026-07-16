@@ -68,6 +68,7 @@ void RNIService::receiveHandoverSignal(MacNodeId nodeId, MacNodeId srcCellId, Ma
             for (auto associateId: associateIds) {
                 if (associateId.getValue() == ipAddress.str()) {
                     subIds.push_back(subscription.first);
+                    // if one value found, go to next subscription
                     break;
                 }
             }

@@ -12,15 +12,15 @@
 #ifndef CORENETWORK_NODES_MEC_MEPLATFORM_MEAPPPACKET_TYPES_H_
 #define CORENETWORK_NODES_MEC_MEPLATFORM_MEAPPPACKET_TYPES_H_
 
-#define START_MEAPP         "MEAppStart"
-#define STOP_MEAPP          "MEAppStop"
-#define MIGRATE_MEAPPS_REQ   "MEAppMigrateReq"
-#define MIGRATE_MEAPP       "MEAppMigrate"
-#define STOP_MIGRATED_MEAPP "MigratedMEAppStop"
+#define START_MEAPP             "MEAppStart"
+#define STOP_MEAPP              "MEAppStop"
+#define MIGRATE_MEAPPS_REQ      "MEAppMigrateReq"
+#define MIGRATE_MEAPP           "MEAppMigrate"
+#define STOP_MIGRATED_MEAPP     "MigratedMEAppStop"
 
-#define ACK_START_MEAPP     "MEAppStartAck"
-#define ACK_STOP_MEAPP      "MEAppStopAck"
-#define ACK_MIGRATE_MEAPP   "MEAppMigrateAck"
+#define ACK_START_MEAPP         "MEAppStartAck"
+#define ACK_STOP_MEAPP          "MEAppStopAck"
+#define ACK_MIGRATE_MEAPP       "MEAppMigrateAck"
 #define ACK_STOP_MIGRATED_MEAPP "MigratedMEAppStopAck"
 
 #define INFO_MEAPP          "MEAppInfo"
