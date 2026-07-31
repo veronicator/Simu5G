@@ -40,6 +40,9 @@ using namespace omnetpp;
 class ServiceRegistry;
 class MecOrchestrator;
 class HostMobilityService;
+class ApplicationMobilityService;
+class RNIService;
+class LocationService;
 
 class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallback
 {
@@ -48,7 +51,10 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     inet::ModuleRefByPar<VirtualisationInfrastructureManager> vim;
     inet::ModuleRefByPar<ServiceRegistry> serviceRegistry;
 
-    HostMobilityService *hms = nullptr;;
+    HostMobilityService *hms = nullptr;
+    ApplicationMobilityService *ams = nullptr;
+    RNIService *rnis = nullptr;
+    LocationService *ls = nullptr;
 
     inet::L3Address mepmAddress_;
 
@@ -113,12 +119,16 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
      */
     void registerMecService(ServiceDescriptor&) const;
 
+    /*
+     * method called by the Mec Service to register its reference ptr to mepm
+     */
+    void registerMecServiceReference(MecServiceBase *mecService, std::string mecServiceName);
+
     // HMS
     /*
      * method called by the HMS to register its reference ptr to mepm
      */
     void registerHostMobilityService(HostMobilityService *mecService) { hms = mecService; }
-
     /*
      * method to update the serving area of the mobile MEC host performing the handover
      */

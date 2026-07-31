@@ -225,6 +225,10 @@ bool ApplicationMobilityResource::removeMigratingApp(std::string migratingApp) {
     return true;
 }
 
+RegistrationInfo* ApplicationMobilityResource::getRegistrationInfoFromAppMobilityServiceId(std::string appMobilityServiceId) {
+    return serviceConsumers_[appMobilityServiceId];
+}
+
 RegistrationInfo* ApplicationMobilityResource::getRegistrationInfoFromAppId(
         std::string appInstanceId) const {
 

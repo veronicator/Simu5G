@@ -49,6 +49,8 @@ void RNIService::initialize(int stage)
         L2MeasResource_.setBinder(binder_);
     }
     else if (stage == inet::INITSTAGE_APPLICATION_LAYER) {
+        mecPlatformManager_->registerMecServiceReference(this, serviceName_);
+
         L2MeasResource_.addEnodeB(eNodeB_);
         baseSubscriptionLocation_ = host_ + baseUriSubscriptions_ + "/";
     }
@@ -304,6 +306,7 @@ void RNIService::handleSubscriptionRequest(SubscriptionBase *subscription, inet:
 
 bool RNIService::manageSubscription()
 {
+    EV << "RNIService::manageSubscription()" << endl;
     int subId = currentSubscriptionServed_->getSubId();
     if (subscriptions_.find(subId) != subscriptions_.end()) {
         EV << "RNIService::manageSubscription() - subscription with id: " << subId << " found" << endl;

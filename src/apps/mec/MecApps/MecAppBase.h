@@ -85,7 +85,7 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     MecServiceSocketInfo* mecServices[4] = {nullptr, nullptr, nullptr, nullptr};
     std::string requiredSerName_;
 
-    bool mobilityAware_;
+    bool mobilityAware_;    // indicates if the mec app can b subject to migration -> ams registration needed
     bool amsRegistration_;
 
     cQueue packetQueue_;
@@ -108,7 +108,7 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
 //    std::string status; // keeps trace of ue position
     inet::TcpSocket* stateSocket_;
     inet::TcpSocket serverSocket_;
-    inet::L3Address localAddress;
+    inet::L3Address localAddress;   // (serving) mec host address
     // ams response counter
     int responsecounter;
 
@@ -182,6 +182,15 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     void socketDeleted(inet::TcpSocket *socket) override {}
 
   public:
+    bool isOnMobileMecHost() { return mobileMecHost; }
+    bool isMobilityAware() { return mobilityAware_;}
+
+    /*
+     * method invoked by VIM during MecApp termination,
+     * to deregister/unsubscribe from AMS (and possibly other MecServices)
+     */
+    void removeServiceRegistrations();
+
     ~MecAppBase() override;
 
 };

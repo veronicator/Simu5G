@@ -65,7 +65,7 @@ class RegistrationInfo : public AttributeBase{
     int getExpiryTime() const {return expiryTime;}
     ServiceConsumerId getServiceConsumerId() const {return serviceConsumerId;}
 
-    bool getMobileMecHost() const { return mobileMecHost; }
+    bool isMobileMecHost() const { return mobileMecHost; }
     std::string getMecHostAddress() const { return mecHostAddress; }
     std::string getMecHostName() const { return mecHostName; }
 

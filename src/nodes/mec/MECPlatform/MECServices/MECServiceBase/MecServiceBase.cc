@@ -147,6 +147,7 @@ void MecServiceBase::handleMessageWhenUp(cMessage *msg)
     if (msg->isSelfMessage()) {
         EV << " MecServiceBase::handleMessageWhenUp - " << msg->getName() << endl;
         if (msg == subscriptionService_) {
+            std::cout << " MecServiceBase::handleMessageWhenUp" << endl;
             bool res = manageSubscription();
             scheduleNextEvent(!res);
         }

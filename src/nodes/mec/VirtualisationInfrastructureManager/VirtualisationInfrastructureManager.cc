@@ -9,6 +9,7 @@
 // and cannot be removed from it.
 //
 #include <inet/networklayer/common/L3AddressResolver.h>
+#include "apps/mec/MecApps/MecAppBase.h"
 #include "nodes/mec/VirtualisationInfrastructureManager/VirtualisationInfrastructureManager.h"
 #include "nodes/mec/UALCMP/UALCMPMessages/UALCMPMessages_m.h"
 #include "nodes/mec/MECOrchestrator/MECOMessages/MECOrchestratorMessages_m.h"
@@ -369,6 +370,9 @@ bool VirtualisationInfrastructureManager::terminateMEApp(DeleteAppMessage *msg)
         int key = ueAppID;
 
         EV << "VirtualisationInfrastructureManager::terminateMEApp - " << mecAppMap[key].meAppModule->getName() << " terminated!" << endl;
+        MecAppBase *mecAppBase = check_and_cast<MecAppBase *>(mecAppMap[key].meAppModule.get());
+        mecAppBase->removeServiceRegistrations();
+
         //terminating the ME App instance
         mecAppMap[key].meAppModule->callFinish();
         mecAppMap[key].meAppModule->deleteModule();

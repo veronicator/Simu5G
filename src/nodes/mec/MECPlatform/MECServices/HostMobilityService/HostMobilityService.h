@@ -35,7 +35,7 @@ class HostMobilityService : public MecServiceBase2
   public:
     HostMobilityService();
     ~HostMobilityService();
-    void handleHostMobilityUpdate();
+    void handleHostMobilityUpdate(MacNodeId srcCellId, MacNodeId trgCellId);
 
   protected:
 
@@ -44,9 +44,9 @@ class HostMobilityService : public MecServiceBase2
     void handleMessage(cMessage *msg) override;
 
     void handleGETRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) override {}
-    void handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket)   override {}
-    void handlePUTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket)    override {}
-    void handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) override {}
+    void handlePOSTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) override;
+    void handlePUTRequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) override;
+    void handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) override;
 
     void socketDataArrived(inet::TcpSocket *socket, inet::Packet *packet, bool urgent) override;
 
@@ -55,7 +55,9 @@ class HostMobilityService : public MecServiceBase2
     void handleRnisResponseMessage(const HttpResponseMessage *msg);
 
     void handleCellChangeNotification(const nlohmann::ordered_json& request);
-    void sendHostMobilityNotification();
+    void sendHostMobilityNotification(MacNodeId srcCellId, MacNodeId trgCellId);
+    void handleSubscriptionRequest(SubscriptionBase *subscription, inet::TcpSocket* socket, const nlohmann::ordered_json& request);
+
 
 
     /*

@@ -63,9 +63,10 @@ class ApplicationMobilityService : public MecServiceBase2
 
   // socket to communicate with RNIS
   inet::TcpSocket *rnisSocket_ = nullptr;
-  // socket to communicate with HMS
-//  inet::TcpSocket *hmsSocket_ = nullptr;
-  std::map<int, std::string> sockIdToMecHost;   // socketId-mecHostName
+
+  // there could be more than one hms linked to a single ams
+  std::map<int, std::string> hmsSockIdToMecHost;   // socketId-mecHostName
+  std::map<std::string, int> hmsSubIds_;     // mapping bw mecHostName and subId of hostMobilitySubscription to hms on that mec host
 
   protected:
     std::map<int, inet::ChunkQueue> socketQueue;
@@ -85,8 +86,12 @@ class ApplicationMobilityService : public MecServiceBase2
     void handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket* socket) override;
 
     void socketDataArrived(inet::TcpSocket *socket, inet::Packet *packet, bool urgent) override;
+    void socketEstablished(inet::TcpSocket *socket) override;
 
     void connectToHms(std::string mecHostName);
+    void handleHmsMessage(cMessage *msg, inet::TcpSocket *socket);
+    void handleHmsRequestMessage(const HttpRequestMessage *msg, inet::TcpSocket *socket);
+    void handleHmsResponseMessage(const HttpResponseMessage *msg, inet::TcpSocket *socket);
 
     void handleRnisMessage(cMessage *msg);
     void handleRnisRequestMessage(const HttpRequestMessage *msg);
@@ -97,6 +102,7 @@ class ApplicationMobilityService : public MecServiceBase2
     void handleNotificationCallback(const nlohmann::ordered_json& request);
 
     void sendCellChangeSubscription(AssociateId associateId);
+    void sendHostMobilitySubscription(inet::TcpSocket *socket, bool newReq = true);
 
     /*
      * This method is called for every element in the subscriptions_ queue.

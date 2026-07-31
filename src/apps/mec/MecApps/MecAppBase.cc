@@ -157,7 +157,6 @@ void MecAppBase::handleMessage(cMessage *msg)
         }
         else if (strcmp(msg->getName(), "amsConnectMessage") == 0) {
             EV << "MecAppBase::handleMessage(): amsConnectMessage " << endl;
-            // todo check correctness
             if (strcmp(msg->getName(), "amsConnectMessage") == 0) {
                 if (mecServices[AMS]->serviceAddress_.isUnspecified()) {
                     EV << "MECAppBase::handleSelfMessage - ams IP address is unspecified (maybe response from the service registry is arriving)" << endl;
@@ -413,7 +412,6 @@ void MecAppBase::sendAmsRegistration(cMessage *msg)
 //    ueAppPort_ = pk->getTag<L4PortInd>()->getSrcPort();
 
     // Send registration
-    // todo for HMS add a new field (isMobile/mobileMecHost) in the registration request
 
     nlohmann::ordered_json registrationBody;
     registrationBody = nlohmann::ordered_json();
@@ -579,6 +577,17 @@ void MecAppBase::removeSocket(inet::TcpSocket *tcpSock)
 void MecAppBase::finish()
 {
     EV << "MecAppBase::finish()" << endl;
+}
+
+void MecAppBase::removeServiceRegistrations() {
+
+    Enter_Method_Silent("MecServiceBase::removeSubscriptions");
+    EV << "MecAppBase::removeServiceRegistrations" << endl;
+    std::cout << "MecAppBase::removeServiceRegistrations" << endl;
+
+    std::string uri = "/example/amsi/v1/app_mobility_services/" + amsRegistrationId;
+    std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());
+    Http::sendDeleteRequest(mecServices[AMS]->serviceSocket_, host.c_str(), uri.c_str());
 }
 
 } //namespace

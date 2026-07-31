@@ -14,6 +14,7 @@
 
 #include "nodes/mec/MECPlatform/MECServices/MECServiceBase/MecServiceBase2.h"
 #include "nodes/mec/MECPlatform/MECServices/RNIService/resources/L2Meas.h"
+#include "nodes/mec/MECPlatformManager/MecPlatformManager.h"
 
 namespace simu5g {
 

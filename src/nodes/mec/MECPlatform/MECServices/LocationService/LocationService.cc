@@ -58,6 +58,7 @@ void LocationService::initialize(int stage)
 
 bool LocationService::manageSubscription()
 {
+    EV << "LocationService::manageSubscription()" << endl;
     int subId = currentSubscriptionServed_->getSubId();
     if (subscriptions_.find(subId) != subscriptions_.end()) {
         EV << "LocationService::manageSubscription() - subscription with id: " << subId << " found" << endl;

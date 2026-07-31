@@ -68,6 +68,9 @@ class ApplicationMobilityResource : public AttributeBase {
 
     std::map<std::string, TargetAppInfo *> getMigratedApps() const {return migratedApps_;}
 
+    // this method returns a registration info pointer from appMobilityServiceId
+    RegistrationInfo *getRegistrationInfoFromAppMobilityServiceId(std::string appMobilityServiceId);
+
     // This method returns a registration info pointer from appInstanceId
     RegistrationInfo *getRegistrationInfoFromAppId(std::string appInstanceId) const;
 

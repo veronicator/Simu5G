@@ -10,6 +10,9 @@
 //
 
 #include "nodes/mec/MECPlatform/MECServices/HostMobilityService/HostMobilityService.h"
+#include "nodes/mec/MECPlatform/MECServices/ApplicationMobilityService/ApplicationMobilityService.h"
+#include "nodes/mec/MECPlatform/MECServices/RNIService/RNIService.h"
+#include "nodes/mec/MECPlatform/MECServices/LocationService/LocationService.h"
 #include "nodes/mec/MECPlatformManager/MecPlatformManager.h"
 #include "nodes/mec/MECOrchestrator/MecOrchestrator.h"
 
@@ -103,7 +106,7 @@ void MecPlatformManager::socketDataArrived(inet::TcpSocket *socket, inet::Packet
                 instantiateMigratingMecApp(new Packet("CreateAppMessage", meoMsg));
              else if (!strcmp(meoMsg->getType(), STOP_MIGRATED_MEAPP))
                 stopMigratedMecApp(new Packet("DeleteAppMessage", meoMsg));
-            /*  // todo gestire casi start / stop
+            /*  // todo gestire gli altri casi
             */
              else if (!strcmp(meoMsg->getType(), ACK_UPDATE_SERVING_AREA))
                  manageUpdateServingAreaResponse(new Packet("UpdateServingAreaResponse", meoMsg));
@@ -235,7 +238,7 @@ void MecPlatformManager::stopMigratedMecApp (cMessage *msg) {
     auto meoMsg = pkt->removeAtFront<DeleteAppMessage>();
 
     vim->terminateMEApp(meoMsg.get());
-    // send an ack to MEO?
+    // send an ack to MEO? send a msg to AMS to update/delete old app registrationInfo?
 
     delete msg;
 }
@@ -275,6 +278,23 @@ void MecPlatformManager::updateServigArea(std::string mecHostName, MacNodeId src
     meoSocket_.send(newPkt);
 }
 
+void MecPlatformManager::registerMecServiceReference(MecServiceBase *mecService, std::string mecServiceName)
+{
+    EV << "MecPlatformManager::registerMecServiceReference" << endl;
+
+    if (mecServiceName.compare("HostMobilityService") == 0)
+        hms = check_and_cast<HostMobilityService *>(mecService);
+
+    else if (mecServiceName.compare("ApplicationMobilityService") == 0)
+        ams = check_and_cast<ApplicationMobilityService *>(mecService);
+
+    else if (mecServiceName.compare("RNIService") == 0)
+        rnis = check_and_cast<RNIService *>(mecService);
+
+    else if (mecServiceName.compare("LocationService") == 0)
+        ls = check_and_cast<LocationService *>(mecService);
+}
+
 void MecPlatformManager::manageUpdateServingAreaResponse(cMessage *msg) {
     Enter_Method_Silent("MecPlatformManager::manageUpdateResponse");
 
@@ -289,7 +309,7 @@ void MecPlatformManager::manageUpdateServingAreaResponse(cMessage *msg) {
         // update serving area ok
         // notify the correct update to HMS
         if (hms != nullptr)
-            hms->handleHostMobilityUpdate();
+            hms->handleHostMobilityUpdate(responseMsg->getSrcCellId(), responseMsg->getTrgCellId());
     }
 }
 

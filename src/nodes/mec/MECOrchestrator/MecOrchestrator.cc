@@ -813,7 +813,7 @@ void MecOrchestrator::sendMigrateAppContext(bool result, int ueAppId, int contex
 
     send(migrateMsg, "toUALCMP");
 
-    // future work: manage the case of multi-ue for a single mec app instance -> remove old mec app instance only if not used anymore
+    // todo: future work: manage the case of multi-ue for a single mec app instance -> remove old mec app instance only if not used anymore
     MECOrchestratorMessage *deleteAppMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
     deleteAppMsg->setType(STOP_MIGRATED_INSTANCE_APP);
     deleteAppMsg->setContextId(contextId);
