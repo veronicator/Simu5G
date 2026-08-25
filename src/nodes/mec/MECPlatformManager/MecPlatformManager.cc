@@ -167,6 +167,24 @@ void MecPlatformManager::triggerMecAppMigration(AssociateId associateId, std::ve
     meoSocket_.send(newPkt);
 }
 
+void MecPlatformManager::triggerMecAppsMigration(std::vector<std::string> appInstanceIds, MacNodeId trgEcgi) {
+
+    Enter_Method_Silent("MecPlatformManager::triggerMecAppsMigration");
+
+    EV << "MecPlatformManager::triggerMecAppsMigration" << endl;
+
+    inet::Packet *newPkt = new inet::Packet("TriggerMigrateAppMessage");
+    auto migrateMsg = inet::makeShared<TriggerMigrationAppMessage>();
+    migrateMsg->setType(MIGRATE_MEAPPS);
+    migrateMsg->setAppInstanceIds(appInstanceIds);
+    migrateMsg->setTrgCellId(trgEcgi);
+    inet::B msgSize = inet::B(40 + strlen(migrateMsg->getType()) + sizeof(appInstanceIds));
+    migrateMsg->setChunkLength(msgSize);
+
+    newPkt->insertAtBack(migrateMsg);
+    meoSocket_.send(newPkt);
+}
+
 /*
  * request migration of MecApps to another MecHost after source MEC host handover
  */
@@ -311,6 +329,7 @@ void MecPlatformManager::manageUpdateServingAreaResponse(cMessage *msg) {
         if (hms != nullptr)
             hms->handleHostMobilityUpdate(responseMsg->getSrcCellId(), responseMsg->getTrgCellId());
     }
+    // if status == false -> nothing happens
 }
 
 } //namespace

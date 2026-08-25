@@ -99,6 +99,7 @@ class ApplicationMobilityService : public MecServiceBase2
 
     void handleSubscriptionRequest(SubscriptionBase *subscription, inet::TcpSocket* socket, const nlohmann::ordered_json& request);
     void handleCellChangeNotification(const nlohmann::ordered_json& request);
+    void handleHostMobilityNotification(const nlohmann::ordered_json& request);
     void handleNotificationCallback(const nlohmann::ordered_json& request);
 
     void sendCellChangeSubscription(AssociateId associateId);

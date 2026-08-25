@@ -14,6 +14,7 @@
 // 
 
 #include "nodes/mec/MECPlatform/MECServices/ApplicationMobilityService/ApplicationMobilityService.h"
+#include "nodes/mec/MECPlatform/MECServices/HostMobilityService/resources/HostMobilityNotification.h"
 #include "nodes/mec/MECPlatform/MECServices/RNIService/resources/FilterCriteriaAssocHo.h"
 #include "nodes/mec/MECPlatform/MECServices/RNIService/resources/CellChangeNotification.h"
 
@@ -466,13 +467,13 @@ void ApplicationMobilityService::handleDELETERequest(const HttpRequestMessage *c
                 auto subIdIt = hmsSubIds_.find(regInfo->getMecHostName());
                 if (subIdIt != hmsSubIds_.end()) {
                     int hmsSubId = subIdIt->second;
-                    std::string uri = "/example/hms/v1/subscriptions/" + std::to_string(hmsSubId);
+                    std::string hmsUri = "/example/hms/v1/subscriptions/" + std::to_string(hmsSubId);
                     for (auto elem: hmsSockIdToMecHost) {
                         if (elem.second.compare(regInfo->getMecHostName()) == 0) {
                             int sockId = elem.first;
                             inet::TcpSocket *hmsSocket = static_cast<inet::TcpSocket *>(socketMap.getSocketById(sockId));
                             std::string host = hmsSocket->getRemoteAddress().str() + ":" + std::to_string(hmsSocket->getRemotePort());
-                            Http::sendDeleteRequest(hmsSocket, host.c_str(), uri.c_str());
+                            Http::sendDeleteRequest(hmsSocket, host.c_str(), hmsUri.c_str());
                             hmsSubIds_.erase(regInfo->getMecHostName());
                         }
                     }
@@ -487,13 +488,16 @@ void ApplicationMobilityService::handleDELETERequest(const HttpRequestMessage *c
         }
         else
         {
-            Http::send204Response(socket);
+            // todo: modificare gestione invio delete request
+//            Http::send204Response(socket);
+
+            EV << "AMS send 204 response socket: " << socket->getState() << endl;
         }
     }
     else if(uri.find(baseUriSubscriptions_) == 0)
     {
         EV << "AMS::Delete subscription " <<  uri <<endl;
-        uri.erase(0,uri.find(baseUriSubscriptions_+"/sub") + baseUriSubscriptions_.length() + 4);
+        uri.erase(0,uri.find(baseUriSubscriptions_ + "/sub") + baseUriSubscriptions_.length() + 4);
         EV << "AMS::Deleting " <<  uri << endl;
         auto it = subscriptions_.find(std::atoi(uri.c_str()));
         if(it == subscriptions_.end())
@@ -638,6 +642,7 @@ void ApplicationMobilityService::handleHmsRequestMessage(const HttpRequestMessag
         if(jsonBody.contains("notificationType")) {
             if(jsonBody["notificationType"] == "HostMobilityNotification") {
                 EV << "AMS::handleHmsRequestMessage - HostMobilityNotification" << endl;
+                handleHostMobilityNotification(jsonBody);
             }
             else
                 handleNotificationCallback(jsonBody);
@@ -665,8 +670,6 @@ void ApplicationMobilityService::handleHmsResponseMessage(const HttpResponseMess
            unsigned int subId = jsonBody["subscriptionId"];
            std::string mecHostName = jsonBody["mecHostName"];
            hmsSubIds_.insert({mecHostName, subId});
-
-           // todo: save the subId of each subscription request (?)
 
            EV << "ApplicationMobilityService::handleHmsResponseMessage - jsonBody: " << jsonBody
                    << "\nsubId: " << std::to_string(subId) << endl;
@@ -847,6 +850,28 @@ void ApplicationMobilityService::sendCellChangeSubscription(AssociateId associat
     Http::sendPostRequest(rnisSocket_, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
 }
 
+// trigger mec Apps migration, after mobile mec host cell change event, sending a message to MEO through MEPM
+void ApplicationMobilityService::handleHostMobilityNotification(const nlohmann::ordered_json& request)
+{
+    EV << "AMS::handleHostMobilityNotification" << endl;
+    HostMobilityNotification *hmsNotification = new HostMobilityNotification();
+    bool res = hmsNotification->fromJson(request);
+    if (res) {
+        std::string servingHostName = hmsNotification->getMecHostName();
+        std::string servingHostAddress = hmsNotification->getMecHostAddress();
+        // source cell of serving mec host before handover -> should be target migration cell
+        MacNodeId srcCellId = hmsNotification->getSrcCellId();
+        // target cell of mec host after handover
+//        MacNodeId trgCellId = hmsNotification->getTrgCellId();
+
+        // get instance id of mec apps to migrate
+        std::vector<std::string> appInstanceIds = registrationResources_->getAppInstanceIdsFromMecHostAddress(servingHostAddress);
+
+        mecPlatformManager_->triggerMecAppsMigration(appInstanceIds, srcCellId);
+    }
+
+}
+
 // trigger mec App migration sending a message to MEO through MEPM
 void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::ordered_json& request) {
 
@@ -877,10 +902,10 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
                 }
 
                 // app mobility allowed
-                for (auto id: associateIds) {   // in our simple case, associateIds is a vector with a single element
-                    if (devInfo.getAssociateId().getValue().compare(id.getValue()) == 0) {
+                for (auto ueAssociateId: associateIds) {   // in our simple case, associateIds is a vector with a single element
+                    if (devInfo.getAssociateId().getValue().compare(ueAssociateId.getValue()) == 0) {
                         EV << "AMS::CellChangeNotification - trigger migration" << endl;
-                        mecPlatformManager_->triggerMecAppMigration(id, appInstanceIds, srcEcgi.getCellId(), trgEcgi.getCellId());
+                        mecPlatformManager_->triggerMecAppMigration(ueAssociateId, appInstanceIds, srcEcgi.getCellId(), trgEcgi.getCellId());
                     }
                 }
             }

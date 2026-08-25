@@ -76,6 +76,9 @@ class ApplicationMobilityResource : public AttributeBase {
 
     RegistrationInfo *getRegistrationInfoFromContext(std::string appInstanceId, ContextTransferState context=USER_CONTEXT_TRANSFER_COMPLETED) const;
 
+    std::vector<RegistrationInfo *> getRegistrationInfoFromMecHostAddress(std::string mecHostAddr);
+
+    std::vector<std::string> getAppInstanceIdsFromMecHostAddress(std::string mecHostAddr);
 };
 
 }   // namespace

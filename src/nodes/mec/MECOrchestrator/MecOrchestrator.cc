@@ -169,8 +169,12 @@ void MecOrchestrator::socketDataArrived(inet::TcpSocket *socket, inet::Packet *m
             if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPPS_REQ)) {
                 migrateAllMecApps(new Packet("MigrateAppMessage", mepmMsg));
             }
+
             else if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPP))
                 migrateMecApp(new Packet("TriggerMigrateAppMessage", mepmMsg));
+
+            else if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPPS))
+                migrateMecApps(new Packet("TriggerMigrateAppMessage", mepmMsg));
 
             else if (!strcmp(mepmMsg->getType(), ACK_MIGRATE_MEAPP))
                 handleMigrateAppAck(new Packet("MigrateAppAckMessage", mepmMsg));
@@ -561,6 +565,104 @@ void MecOrchestrator::migrateMecApp(cMessage *msg) {
                 }
             }   // end for - appInstanceId
         }   // end if - ueAddress
+    }   // end for - mecAppMapEntry
+}
+
+// app migration after mec host handover
+void MecOrchestrator::migrateMecApps(cMessage *msg) {
+    Enter_Method_Silent("MecOrchestrator::migrateMecApps");
+
+    EV << "MecOrchestrator::migrateMecApp" << endl;
+    inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
+    auto mepmMsg = pkt->peekAtFront<TriggerMigrationAppMessage>();
+    // note: only "UE_IPv4_ADDRESS" type is supported for now
+    std::vector<std::string> appInstanceIds = mepmMsg->getAppInstanceIds();
+    MacNodeId trgCellId = mepmMsg->getTrgCellId();
+
+    for (const auto& contextApp : meAppMap) {   // for loop on the mecAppMap
+        auto oldMecApp = contextApp.second;
+        for (auto appInstanceId: appInstanceIds) {  // for loop on app instances of mobility-aware meApps found by ams
+            bool sameCoverageArea = false;
+            if (oldMecApp.mecAppInstanceId.compare(appInstanceId) == 0) {
+
+                for (auto mecHost: cellToMecHosts[trgCellId]) {
+                    if (oldMecApp.mecHost == mecHost) { // check if the target cell is associated to the source mec host or not
+                        sameCoverageArea = true;
+                        break;
+                    }
+                }
+                if (!sameCoverageArea) {
+                    int contextId = oldMecApp.contextId;
+                    auto it = mecApplicationDescriptors_.find(oldMecApp.appDId);
+                    if (it == mecApplicationDescriptors_.end()) {
+                        // this should not happen bc the appDid is in the mecAppMap, so the mecApp is already instantiated at least once
+                        EV << "MecOrchestrator::migrateMecApp - Application package with AppDId[" << oldMecApp.appDId << "] not onboarded." << endl;
+                        continue;
+                    }
+                    const ApplicationDescriptor& desc = it->second;
+                    // find new mec host among those associated with target cell
+                    cModule *bestHost = mecHostSelectionPolicy_->findBestTargetMecHost(desc, cellToMecHosts[trgCellId]);
+
+                    if (bestHost != nullptr) {
+                        auto createAppMsg = inet::makeShared<CreateAppMessage>();
+                        createAppMsg->setType(MIGRATE_MEAPP);
+
+                        createAppMsg->setUeAppID(oldMecApp.mecUeAppID);
+                        createAppMsg->setMEModuleName(desc.getAppName().c_str());
+                        createAppMsg->setMEModuleType(desc.getAppProvider().c_str());
+
+                        createAppMsg->setRequiredCpu(desc.getVirtualResources().cpu);
+                        createAppMsg->setRequiredRam(desc.getVirtualResources().ram);
+                        createAppMsg->setRequiredDisk(desc.getVirtualResources().disk);
+
+                        // This field is useful for MEC services not ETSI MEC compliant (e.g. OMNeT++ like)
+                        // In such cases, the VIM must connect the gates between the MEC application and the service
+
+                        // Insert OMNeT like services, only one is supported for now
+                        if (!desc.getOmnetppServiceRequired().empty())
+                            createAppMsg->setRequiredService(desc.getOmnetppServiceRequired().c_str());
+                        else
+                            createAppMsg->setRequiredService("NULL");
+
+                        createAppMsg->setContextId(contextId);
+
+                        inet::B msgSize = inet::B(80 + strlen(createAppMsg->getType()) + strlen(createAppMsg->getSourceAddress())
+                                + strlen(createAppMsg->getDestinationAddress()) + strlen(createAppMsg->getDestinationMecAppAddress()) + strlen(createAppMsg->getMEModuleType())
+                                + strlen(createAppMsg->getMEModuleName()) + strlen(createAppMsg->getRequiredService()) + strlen(createAppMsg->getProvidedService()));
+                        createAppMsg->setChunkLength(msgSize);
+
+                        // create pkt to send through socket to the mepm on the new mec host
+                        inet::Packet *newPkt = new inet::Packet("CreateAppMessage");   // new app creation
+                        newPkt->insertAtBack(createAppMsg);
+
+
+                        // Add the new MEC app in the map structure
+                        mecAppMapEntry newMecApp;
+                        newMecApp.appDId = oldMecApp.appDId;
+                        newMecApp.mecUeAppID = oldMecApp.mecUeAppID;
+                        newMecApp.mecHost = bestHost;
+                        newMecApp.ueAddress = oldMecApp.ueAddress;
+                        newMecApp.vim = bestHost->getSubmodule("vim");
+                        newMecApp.mecpm = bestHost->getSubmodule("mecPlatformManager");
+
+                        newMecApp.mecAppName = desc.getAppName().c_str();
+
+                        tmpMeAppMap[contextId] = newMecApp;
+
+                        MecPlatformManager *mecpm = check_and_cast<MecPlatformManager *>(newMecApp.mecpm);
+
+                        inet::L3Address mepmAddress = mecpm->getMepmAddress();
+                        int sockId = mepmSockets_[mepmAddress];
+                        inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(sockets_.getSocketById(sockId));
+
+                        socket->send(newPkt);
+                    }
+                    else {
+                        EV << "MecOrchestrator::migrateMecApp - A suitable MEC host has not been selected, the MECApp cannot be migrated" << endl;
+                    }
+                }
+            } // end if compare appInstanceId
+        }   // end for - appInstanceId
     }   // end for - mecAppMapEntry
 }
 

@@ -152,6 +152,7 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     void stopMigratedMecApp(bool result, int ueAppId, int contextId);
 
     void migrateAllMecApps(cMessage *msg);
+    void migrateMecApps(cMessage *msg);
     void migrateMecApp(cMessage *msg);
     void handleMigrateAppAck(cMessage *msg);
 

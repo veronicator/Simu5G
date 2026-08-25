@@ -181,6 +181,27 @@ void HostMobilityService::handlePUTRequest(const HttpRequestMessage *currentRequ
 
 void HostMobilityService::handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) {
     EV << "HostMobilityService::handleDELETERequest" << endl;
+
+    // "/example/hms/v1/subscriptions/"
+    std::string uri = currentRequestMessageServed->getUri();
+
+    if (uri.find(baseUriSubscriptions_) == 0) {
+        uri.erase(0, uri.find(baseUriSubscriptions_ + "/") + baseUriSubscriptions_.length() + 1);
+        EV << "HMS - Deleting subscription" << endl;
+        auto it = subscriptions_.find(std::stoi(uri));
+        if (it != subscriptions_.end()) {
+            subscriptions_.erase(it);
+            Http::send204Response(socket);
+        }
+        else {
+            EV << "HMS::delete subscription: subscriber not found" << endl;
+            Http::send404Response(socket);
+        }
+    }
+    else {
+        Http::send400Response(socket);
+        EV << "HMS::DELETERequest - bad uri" << endl;
+    }
 }
 
 

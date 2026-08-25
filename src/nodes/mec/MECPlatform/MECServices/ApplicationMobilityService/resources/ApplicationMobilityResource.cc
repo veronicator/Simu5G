@@ -256,5 +256,28 @@ RegistrationInfo* ApplicationMobilityResource::getRegistrationInfoFromContext(
     return nullptr;
 }
 
+std::vector<RegistrationInfo *> ApplicationMobilityResource::getRegistrationInfoFromMecHostAddress(std::string mecHostAddr) {
+
+    std::vector<RegistrationInfo *> regInfo;
+    for (auto consumer: serviceConsumers_) {
+        if (mecHostAddr.compare(consumer.second->getMecHostAddress()) == 0)
+            regInfo.push_back(consumer.second);
+    }
+
+    return regInfo;
+}
+
+std::vector<std::string> ApplicationMobilityResource::getAppInstanceIdsFromMecHostAddress(std::string mecHostAddr) {
+
+    std::vector<std::string> appInstanceIds;
+    for (auto consumer: serviceConsumers_) {
+        if (mecHostAddr.compare(consumer.second->getMecHostAddress()) == 0)
+            appInstanceIds.push_back(consumer.second->getServiceConsumerId().appInstanceId);
+    }
+
+    return appInstanceIds;
+}
+
+
 }   // namespace
 

@@ -20,8 +20,8 @@ public:
     HostMobilityNotification();
     virtual ~HostMobilityNotification();
 
-    virtual nlohmann::ordered_json toJson() const override { return nullptr; }
-    virtual bool fromJson(const nlohmann::ordered_json& json) override {return false; }
+    virtual nlohmann::ordered_json toJson() const override;
+    virtual bool fromJson(const nlohmann::ordered_json& json) override;
     virtual EventNotification* handleNotification(FilterCriteriaBase *filters, bool noCheck=false) override { return nullptr; }
 
 //    void setSrcCellId(MacNodeId srcCellId) { srcCellId_ = srcCellId; }
@@ -30,8 +30,8 @@ public:
 
     std::string getMecHostName() const { return mecHostName_; }
     std::string getMecHostAddress() const { return mecHostAddress_; }
-    MacNodeId getSrcEcgi() const { return srcCellId_; }
-    MacNodeId getTrgEcgi() const { return trgCellId_; }
+    MacNodeId getSrcCellId() const { return srcCellId_; }
+    MacNodeId getTrgCellId() const { return trgCellId_; }
 };
 
 } /* namespace simu5g */

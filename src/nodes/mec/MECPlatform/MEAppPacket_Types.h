@@ -16,11 +16,13 @@
 #define STOP_MEAPP              "MEAppStop"
 #define MIGRATE_MEAPPS_REQ      "MEAppMigrateReq"
 #define MIGRATE_MEAPP           "MEAppMigrate"
+#define MIGRATE_MEAPPS          "MEAppsMigrate"
 #define STOP_MIGRATED_MEAPP     "MigratedMEAppStop"
 
 #define ACK_START_MEAPP         "MEAppStartAck"
 #define ACK_STOP_MEAPP          "MEAppStopAck"
 #define ACK_MIGRATE_MEAPP       "MEAppMigrateAck"
+#define ACK_MIGRATE_MEAPPS      "MEAppsMigrateAck"
 #define ACK_STOP_MIGRATED_MEAPP "MigratedMEAppStopAck"
 
 #define INFO_MEAPP          "MEAppInfo"
