@@ -203,6 +203,8 @@ void UALCMPApp::handleMigrateAppMessage(UALCMPMessage *msg) {
         inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(socketMap.getSocketById(sockId));
 
         if (socket) {
+            jsonBody["startMigrationTime"] = migrate->getStartMigrationTime().str();
+            jsonBody["stopMigrationTime"] = migrate->getStopMigrationTime().str();
             jsonBody["notificationType"] = ADDRESS_CHANGE_NOTIFICATION;
             jsonBody["contextId"] = std::to_string(migrate->getContextId());
             jsonBody["appInstanceId"] = migrate->getAppInstanceId();

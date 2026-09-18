@@ -49,13 +49,13 @@ class MECMessage extends inet::FieldsChunk {
         
     //type of message
     string type;
+    simtime_t timestamp;
     
 }
 
 class CreateAppMessage extends MECMessage {
 
     unsigned int sno;
-    simtime_t timestamp;
     
     //communication informations
     string sourceAddress;
@@ -88,7 +88,6 @@ class CreateAppMessage extends MECMessage {
 class DeleteAppMessage extends MECMessage {
    
     unsigned int sno;
-    simtime_t timestamp;
     
     //communication informations
     string sourceAddress;
@@ -121,7 +120,6 @@ class MigrateAppMessage extends MECMessage {
    	string mepmAddress;
    
     unsigned int sno;
-    simtime_t timestamp;
 
     int contextId;
     
@@ -135,7 +133,6 @@ class MigrateAppAckMessage extends MECMessage {
     int contextId;
    
     unsigned int sno;
-    simtime_t timestamp;
     
 //    MecAppInstanceInfo appInfo;
     bool status;

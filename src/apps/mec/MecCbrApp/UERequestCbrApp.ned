@@ -67,6 +67,9 @@ simple UERequestCbrApp like IApp
         @signal[migrationTime];
         @statistic[migrationTime](title="appMigrationTime"; unit="s"; source="migrationTime"; record=last,mean);
 
+        @signal[migrationTimeTotal];
+        @statistic[migrationTimeTotal](title="appMigrationTimeTotal"; unit="s"; source="migrationTimeTotal"; record=last,mean);
+
 
     gates:
         output socketOut;

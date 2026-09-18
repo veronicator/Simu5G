@@ -370,8 +370,6 @@ bool VirtualisationInfrastructureManager::terminateMEApp(DeleteAppMessage *msg)
         int key = ueAppID;
 
         EV << "VirtualisationInfrastructureManager::terminateMEApp - " << mecAppMap[key].meAppModule->getName() << " terminated!" << endl;
-        MecAppBase *mecAppBase = check_and_cast<MecAppBase *>(mecAppMap[key].meAppModule.get());
-        mecAppBase->removeServiceRegistrations();
 
         //terminating the ME App instance
         mecAppMap[key].meAppModule->callFinish();
@@ -415,6 +413,74 @@ bool VirtualisationInfrastructureManager::terminateMEApp(DeleteAppMessage *msg)
     else {
         EV << "VirtualisationInfrastructureManager::terminateMEApp - \tWARNING: NO INSTANCE FOUND!" << endl;
         return false;
+    }
+}
+
+bool VirtualisationInfrastructureManager::terminateMecApp(int ueAppId)
+{
+    Enter_Method_Silent("VirtualisationInfrastructureManager::terminateMecApp");
+
+    if (!mecAppMap.empty() && mecAppMap.find(ueAppId) != mecAppMap.end()) {
+        //retrieve mecAppMap map key
+        int key = ueAppId;
+
+        EV << "VirtualisationInfrastructureManager::terminateMecApp - " << mecAppMap[key].meAppModule->getName() << " terminated!" << endl;
+
+        //terminating the ME App instance
+        mecAppMap[key].meAppModule->callFinish();
+        mecAppMap[key].meAppModule->deleteModule();
+        currentMEApps--;
+        EV << "VirtualisationInfrastructureManager::terminateMecApp - currentMEApps: " << currentMEApps << " / " << maxMECApps << endl;
+
+        //Sending ACK_STOP_MEAPP to the UEApp
+
+        //before removing the map entry!
+        int index = mecAppMap[key].meAppGateIndex;
+        int serviceIndex = mecAppMap[key].serviceIndex;
+
+        cModule *at = mecHost->getSubmodule("at");
+        if (at == nullptr)
+            throw cRuntimeError("at module, i.e. message dispatcher for SAP between application and transport layer not found");
+
+        at->gate("out", index)->disconnect();
+        at->gate("in", index)->disconnect();
+
+        if (serviceIndex >= 0) {
+            //disconnecting internal MEPlatform gates to the MEService gates
+            (meServices.at(serviceIndex))->gate("meAppOut", index)->disconnect();
+            (meServices.at(serviceIndex))->gate("meAppIn", index)->disconnect();
+            //disconnecting MEPlatform gates to the MEApp gates
+            mecPlatform->gate("meAppOut", index)->disconnect();
+            mecPlatform->gate("meAppIn", index)->disconnect();
+        }
+
+        //deallocate resources
+        deallocateResources(mecAppMap[key].resources.ram, mecAppMap[key].resources.disk, mecAppMap[key].resources.cpu);
+
+        //update map
+        mecAppMap.erase(ueAppId);
+
+        freeGates.push_back(index);
+
+        return true;
+    }
+    else {
+        EV << "VirtualisationInfrastructureManager::terminateMecApp - \tWARNING: NO INSTANCE FOUND!" << endl;
+        return false;
+    }
+}
+
+void VirtualisationInfrastructureManager::triggerServiceUnsubscription(DeleteAppMessage *msg)
+{
+    int ueAppID = msg->getUeAppID();
+
+    if (!mecAppMap.empty() && mecAppMap.find(ueAppID) != mecAppMap.end()) {
+        //retrieve mecAppMap map key
+        int key = ueAppID;
+
+        EV << "VirtualisationInfrastructureManager::triggerServiceUnsubscription" << endl;
+        MecAppBase *mecAppBase = check_and_cast<MecAppBase *>(mecAppMap[key].meAppModule.get());
+        mecAppBase->removeServiceRegistrations();
     }
 }
 

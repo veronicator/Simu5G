@@ -453,8 +453,8 @@ void MecOrchestrator::stopMigratedMecApp(bool result, int ueAppId, int contextId
     inet::Packet *newPkt = new inet::Packet("DeleteAppMessage");
     newPkt->insertAtBack(deleteAppMsg);
 
-    MecPlatformManager *mecpm = check_and_cast<MecPlatformManager *>(meAppMap[contextId].mecpm);
-    inet::L3Address mepmAddress = mecpm->getMepmAddress();
+    MecPlatformManager *oldMecpm = check_and_cast<MecPlatformManager *>(meAppMap[contextId].mecpm);
+    inet::L3Address mepmAddress = oldMecpm->getMepmAddress();
     int sockId = mepmSockets_[mepmAddress];
     inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(sockets_.getSocketById(sockId));
 
@@ -646,6 +646,8 @@ void MecOrchestrator::migrateMecApps(cMessage *msg) {
                         newMecApp.mecpm = bestHost->getSubmodule("mecPlatformManager");
 
                         newMecApp.mecAppName = desc.getAppName().c_str();
+
+                        newMecApp.startMigrationTime = mepmMsg->getTimestamp();
 
                         tmpMeAppMap[contextId] = newMecApp;
 
@@ -904,6 +906,8 @@ void MecOrchestrator::sendMigrateAppContext(bool result, int ueAppId, int contex
 
     mecAppMapEntry mecAppStatus = tmpMeAppMap[contextId];
 
+    migrateMsg->setStartMigrationTime(mecAppStatus.startMigrationTime);
+    migrateMsg->setStopMigrationTime(simTime());
     migrateMsg->setContextId(contextId);
     migrateMsg->setAppInstanceId(mecAppStatus.mecAppInstanceId.c_str());
     migrateMsg->setRequestId(ueAppId);

@@ -79,6 +79,7 @@ class UERequestCbrApp : public cSimpleModule
     static simsignal_t responseTimeSignal_;
     static simsignal_t instantiationTimeSignal_;
     static simsignal_t migrationTimeSignal_;
+    static simsignal_t migrationTimeTotalSignal_;
 
   public:
     ~UERequestCbrApp() override;

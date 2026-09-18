@@ -86,7 +86,7 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     std::string requiredSerName_;
 
     bool mobilityAware_;    // indicates if the mec app can b subject to migration -> ams registration needed
-    bool amsRegistration_;
+    bool amsRegistration_;  // indicates if the ams registration request was sent
 
     cQueue packetQueue_;
     cMessage *currentProcessedMsg_ = nullptr;
@@ -110,7 +110,7 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     inet::TcpSocket serverSocket_;
     inet::L3Address localAddress;   // (serving) mec host address
     // ams response counter
-    int responsecounter;
+//    int responsecounter;
 
     bool registered;
     bool subscribed;

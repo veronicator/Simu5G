@@ -488,8 +488,7 @@ void ApplicationMobilityService::handleDELETERequest(const HttpRequestMessage *c
         }
         else
         {
-            // todo: modificare gestione invio delete request
-//            Http::send204Response(socket);
+            Http::send204Response(socket);
 
             EV << "AMS send 204 response socket: " << socket->getState() << endl;
         }
@@ -857,6 +856,7 @@ void ApplicationMobilityService::handleHostMobilityNotification(const nlohmann::
     HostMobilityNotification *hmsNotification = new HostMobilityNotification();
     bool res = hmsNotification->fromJson(request);
     if (res) {
+        simtime_t startMigrationTime = simTime();
         std::string servingHostName = hmsNotification->getMecHostName();
         std::string servingHostAddress = hmsNotification->getMecHostAddress();
         // source cell of serving mec host before handover -> should be target migration cell
@@ -867,7 +867,7 @@ void ApplicationMobilityService::handleHostMobilityNotification(const nlohmann::
         // get instance id of mec apps to migrate
         std::vector<std::string> appInstanceIds = registrationResources_->getAppInstanceIdsFromMecHostAddress(servingHostAddress);
 
-        mecPlatformManager_->triggerMecAppsMigration(appInstanceIds, srcCellId);
+        mecPlatformManager_->triggerMecAppsMigration(startMigrationTime, appInstanceIds, srcCellId);
     }
 
 }

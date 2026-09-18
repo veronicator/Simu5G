@@ -81,7 +81,7 @@ void MecAppBase::initialize(int stage)
     // AMS/HMS
     localAddress = L3AddressResolver().resolve(getParentModule()->getFullPath().c_str());
 
-    responsecounter = 0;
+//    responsecounter = 0;
 
     webHook="/amsWebHook_" + std::to_string(getId());
     // AMS
@@ -199,7 +199,7 @@ void MecAppBase::handleMessage(cMessage *msg)
             std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str()+":"+std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());
             std::string uristring = "/example/amsi/v1/subscriptions";
             Http::sendPostRequest(mecServices[AMS]->serviceSocket_, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
-            responsecounter++;
+//            responsecounter++;
         }
         else {
             handleSelfMessage(msg);
@@ -360,33 +360,45 @@ void MecAppBase::handleAmsMessage(int connId) {
 
         }
         else if(amsHttpMessage->getType() == RESPONSE){
-            responsecounter--;
+//            responsecounter--;
             EV << "MecAppBase::handleAmsMessage - Received response - payload: " << " " << amsHttpMessage->getBody() << endl;
             HttpResponseMessage* amsResponse = check_and_cast<HttpResponseMessage*>(amsHttpMessage);
 
-            nlohmann::json jsonBody = nlohmann::json::parse(amsResponse->getBody());
-            if(!jsonBody.empty()){
-                if(jsonBody.contains("appMobilityServiceId"))
-                {
-                    amsRegistrationId = jsonBody["appMobilityServiceId"];
-                    registered = true;
-                    EV << "MecAppBase::handleAmsMessage - registration ID: " << amsRegistrationId << endl;
-
-                    cMessage *m = new cMessage("subscribeAms");
-                    scheduleAt(simTime()+0.001, m);
-                }
-                else if(jsonBody.contains("callbackReference")){
-
-                    std::stringstream stream;
-                    stream << "sub" << jsonBody["subscriptionId"];
-                    amsSubscriptionId = stream.str();
-                    EV << "MecAppBase::handleAmsMessage - subscription ID triggered: " << amsSubscriptionId << endl;
-
-                    if(!amsSubscriptionId.empty())
+            if (amsResponse->getCode() == 200) {
+                nlohmann::json jsonBody = nlohmann::json::parse(amsResponse->getBody());
+                if(!jsonBody.empty()){
+                    if(jsonBody.contains("appMobilityServiceId"))
                     {
-                        subscribed = true;
+                        amsRegistrationId = jsonBody["appMobilityServiceId"];
+                        registered = true;
+                        EV << "MecAppBase::handleAmsMessage - registration ID: " << amsRegistrationId << endl;
+
+                        cMessage *m = new cMessage("subscribeAms");
+                        scheduleAt(simTime()+0.001, m);
+                    }
+                    else if(jsonBody.contains("callbackReference")){
+
+                        std::stringstream stream;
+                        stream << "sub" << jsonBody["subscriptionId"];
+                        amsSubscriptionId = stream.str();
+                        EV << "MecAppBase::handleAmsMessage - subscription ID triggered: " << amsSubscriptionId << endl;
+
+                        if(!amsSubscriptionId.empty())
+                        {
+                            subscribed = true;
+                        }
                     }
                 }
+            }
+            else if (amsResponse->getCode() == 204) {
+                // vim -> delete app
+                std::cout << "MecAppBase::handleAmsMessage - Received response 204" << endl;
+                // response of deleteRequest - service deregistration
+                if (mobilityAware_ && !amsRegistration_)
+                    vim->terminateMecApp(mecAppId);
+            }
+            else if (amsResponse->getCode() == 404) {
+                // this should not happen
             }
         }
         else{
@@ -444,7 +456,7 @@ void MecAppBase::sendAmsRegistration(cMessage *msg)
     const char *uri = "/example/amsi/v1/app_mobility_services";
     EV << "AMS Registration host " << host << endl;
     Http::sendPostRequest(mecServices[AMS]->serviceSocket_, registrationBody.dump().c_str(), host.c_str(), uri);
-    responsecounter++;
+//    responsecounter++;
     amsRegistration_ = true;
 }
 
@@ -585,9 +597,12 @@ void MecAppBase::removeServiceRegistrations() {
     EV << "MecAppBase::removeServiceRegistrations" << endl;
     std::cout << "MecAppBase::removeServiceRegistrations" << endl;
 
-    std::string uri = "/example/amsi/v1/app_mobility_services/" + amsRegistrationId;
-    std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());
-    Http::sendDeleteRequest(mecServices[AMS]->serviceSocket_, host.c_str(), uri.c_str());
+    if (mobilityAware_ && amsRegistration_) {
+        std::string uri = "/example/amsi/v1/app_mobility_services/" + amsRegistrationId;
+        std::string host = mecServices[AMS]->serviceSocket_->getRemoteAddress().str() + ":" + std::to_string(mecServices[AMS]->serviceSocket_->getRemotePort());
+        Http::sendDeleteRequest(mecServices[AMS]->serviceSocket_, host.c_str(), uri.c_str());
+        amsRegistration_ = false;
+    }
 }
 
 } //namespace

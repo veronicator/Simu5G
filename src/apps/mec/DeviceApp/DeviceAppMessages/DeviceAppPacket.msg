@@ -56,6 +56,18 @@ class DeviceAppStartAckPacket extends DeviceAppPacket
 	int port;
 }
 
+class DeviceAppMigratedPacket extends DeviceAppPacket
+{
+    simtime_t startMigrationTime;
+    simtime_t stopMigrationTime;
+    
+    string contextId;
+    bool result;
+    string ipAddress;
+    string reason;
+	int port;
+}
+
 class DeviceAppStopAckPacket extends DeviceAppPacket
 {
     bool result;

@@ -39,6 +39,7 @@ simsignal_t UERequestCbrApp::downLinkTimeSignal_ = registerSignal("downLinkTime"
 simsignal_t UERequestCbrApp::responseTimeSignal_ = registerSignal("responseTime");
 simsignal_t UERequestCbrApp::instantiationTimeSignal_ = registerSignal("instantiationTime");
 simsignal_t UERequestCbrApp::migrationTimeSignal_ = registerSignal("migrationTime");
+simsignal_t UERequestCbrApp::migrationTimeTotalSignal_ = registerSignal("migrationTimeTotal");
 
 UERequestCbrApp::~UERequestCbrApp()
 {
@@ -265,12 +266,19 @@ void UERequestCbrApp::handleMigrateMECRequestCbrApp(cMessage *msg)
 {
     EV << "UERequestCbrApp::handleMigrateMECRequestCbrApp - Received Migrate packet" << endl;
     inet::Packet *packet = check_and_cast<inet::Packet *>(msg);
-    auto pkt = packet->peekAtFront<DeviceAppStartAckPacket>();
+    auto pkt = packet->peekAtFront<DeviceAppMigratedPacket>();
 
     if (pkt->getResult() == true) {
+        simtime_t startMigration = pkt->getStartMigrationTime();
+        simtime_t stopMigration = pkt->getStopMigrationTime();
 
-        simtime_t migrationTime = simTime() - binder_->getStartMECHostHandover();
+        // migration time from start migration in AMS to ack migration in MEO
+        simtime_t migrationTime = stopMigration - startMigration;
+        // migration time from start migration in AMS to address update on ueApp
+        simtime_t migrationTimeTotal = simTime() - startMigration;
+
         emit(migrationTimeSignal_, migrationTime);
+        emit(migrationTimeTotalSignal_, migrationTimeTotal);
 
         mecAppAddress_ = L3AddressResolver().resolve(pkt->getIpAddress());
         mecAppPort_ = pkt->getPort();

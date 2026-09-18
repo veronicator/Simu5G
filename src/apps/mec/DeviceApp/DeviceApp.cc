@@ -325,7 +325,7 @@ void DeviceApp::handleUALCMPMessage()
                         Http::send400Response(&ualcmpSocket_); // bad body JSON
                         return;
                     }
-                    inet::Packet *packet = new inet::Packet("DeviceAppStartAckPacket");
+                    inet::Packet *packet = new inet::Packet("DeviceAppMigratedPacket");
                     std::string mecAppEndPoint = jsonBody["referenceURI"];
 
                     EV_INFO << "DeviceApp::handleUALCMPMessage - POSTReq - reference URI of the application instance context is: " << appContextUri << endl;
@@ -335,10 +335,19 @@ void DeviceApp::handleUALCMPMessage()
 
                     std::string contextId = jsonBody["contextId"];
 
+                    std::string startMigration = jsonBody["startMigrationTime"];
+                    std::string stopMigration = jsonBody["stopMigrationTime"];
+
+                    simtime_t startMigrationTime = SimTime::parse(startMigration.c_str());
+                    simtime_t stopMigrationTime = SimTime::parse(stopMigration.c_str());
+
                     EV_DEBUG << "DeviceApp::handleUALCMPMessage - POSTReq - sending ChangeAddress to the UE app" << endl;
 
-                    auto addrChange = inet::makeShared<DeviceAppStartAckPacket>();
+                    auto addrChange = inet::makeShared<DeviceAppMigratedPacket>();
                     addrChange->setType(MIGRATE_MECAPP);
+                    addrChange->setStartMigrationTime(startMigrationTime);
+                    addrChange->setStopMigrationTime(stopMigrationTime);
+
                     addrChange->setContextId(contextId.c_str());
                     addrChange->setResult(true);
                     addrChange->setIpAddress(endPoint[0].c_str());

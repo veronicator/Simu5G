@@ -133,6 +133,13 @@ class VirtualisationInfrastructureManager : public cSimpleModule
     // terminating the correspondent MEC App (called by MECPM)
     bool terminateMEApp(DeleteAppMessage *msg);
     bool terminateEmulatedMEApp(DeleteAppMessage *msg);
+    // called by MecAppBase
+    bool terminateMecApp(int ueAppId);
+
+    /**
+     * method to trigger service unsubscription and/or deregistration of a mec app that is going to be terminated
+     */
+    void triggerServiceUnsubscription(DeleteAppMessage *msg);
 
     /*
      * This method is called by the MEC apps that want to simulate

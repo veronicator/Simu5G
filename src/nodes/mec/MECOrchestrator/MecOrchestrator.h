@@ -56,6 +56,8 @@ struct mecAppMapEntry
     int lastAckStartSeqNum;
     int lastAckStopSeqNum;
 
+    simtime_t startMigrationTime;
+
 };
 
 class UALCMPMessage;

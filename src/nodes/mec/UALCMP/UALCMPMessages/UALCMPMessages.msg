@@ -54,6 +54,8 @@ message MigrateContextAppMessage extends UALCMPMessage
     int contextId;
     string appInstanceId;
     string appInstanceUri;
+    simtime_t startMigrationTime;
+    simtime_t stopMigrationTime;
 }
 
 message MigrateContextAppAckMessage extends UALCMPMessage

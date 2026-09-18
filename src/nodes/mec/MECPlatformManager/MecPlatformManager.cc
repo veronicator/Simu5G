@@ -106,7 +106,7 @@ void MecPlatformManager::socketDataArrived(inet::TcpSocket *socket, inet::Packet
                 instantiateMigratingMecApp(new Packet("CreateAppMessage", meoMsg));
              else if (!strcmp(meoMsg->getType(), STOP_MIGRATED_MEAPP))
                 stopMigratedMecApp(new Packet("DeleteAppMessage", meoMsg));
-            /*  // todo gestire gli altri casi
+            /*  // todo handle other cases
             */
              else if (!strcmp(meoMsg->getType(), ACK_UPDATE_SERVING_AREA))
                  manageUpdateServingAreaResponse(new Packet("UpdateServingAreaResponse", meoMsg));
@@ -167,7 +167,7 @@ void MecPlatformManager::triggerMecAppMigration(AssociateId associateId, std::ve
     meoSocket_.send(newPkt);
 }
 
-void MecPlatformManager::triggerMecAppsMigration(std::vector<std::string> appInstanceIds, MacNodeId trgEcgi) {
+void MecPlatformManager::triggerMecAppsMigration(simtime_t startMigration, std::vector<std::string> appInstanceIds, MacNodeId trgEcgi) {
 
     Enter_Method_Silent("MecPlatformManager::triggerMecAppsMigration");
 
@@ -176,9 +176,10 @@ void MecPlatformManager::triggerMecAppsMigration(std::vector<std::string> appIns
     inet::Packet *newPkt = new inet::Packet("TriggerMigrateAppMessage");
     auto migrateMsg = inet::makeShared<TriggerMigrationAppMessage>();
     migrateMsg->setType(MIGRATE_MEAPPS);
+    migrateMsg->setTimestamp(startMigration);
     migrateMsg->setAppInstanceIds(appInstanceIds);
     migrateMsg->setTrgCellId(trgEcgi);
-    inet::B msgSize = inet::B(40 + strlen(migrateMsg->getType()) + sizeof(appInstanceIds));
+    inet::B msgSize = inet::B(48 + strlen(migrateMsg->getType()) + sizeof(appInstanceIds));
     migrateMsg->setChunkLength(msgSize);
 
     newPkt->insertAtBack(migrateMsg);
@@ -255,8 +256,7 @@ void MecPlatformManager::stopMigratedMecApp (cMessage *msg) {
     inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
     auto meoMsg = pkt->removeAtFront<DeleteAppMessage>();
 
-    vim->terminateMEApp(meoMsg.get());
-    // send an ack to MEO? send a msg to AMS to update/delete old app registrationInfo?
+    vim->triggerServiceUnsubscription(meoMsg.get());
 
     delete msg;
 }
