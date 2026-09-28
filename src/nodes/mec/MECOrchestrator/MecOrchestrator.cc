@@ -11,7 +11,9 @@
 
 #include "nodes/mec/MECOrchestrator/MecOrchestrator.h"
 
-#include "nodes/mec/MobileMECHost.h"
+//#include "nodes/mec/MobileMECHost.h"
+
+#include "common/cellInfo/CellInfo.h"
 
 #include "nodes/mec/MECPlatformManager/MecPlatformManager.h"
 #include "nodes/mec/VirtualisationInfrastructureManager/VirtualisationInfrastructureManager.h"
@@ -693,7 +695,7 @@ void MecOrchestrator::migrateAllMecApps(cMessage *msg) {
             }
 
             const ApplicationDescriptor& desc = it->second;
-            auto* mecHostName = check_and_cast<MobileMECHost *>(oldMecApp.mecHost)->getName();
+            auto* mecHostName = oldMecApp.mecHost->getName();
             cModule *bestHost = migrationSelectionPolicy->findNewBestMecHost(desc, mecHostName);
 
             if (bestHost != nullptr) {

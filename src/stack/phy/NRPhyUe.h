@@ -20,7 +20,6 @@ namespace simu5g {
 
 class NRPhyUe : public LtePhyUeD2D
 {
-    friend class MobileMECHost;
 
   public:
 
