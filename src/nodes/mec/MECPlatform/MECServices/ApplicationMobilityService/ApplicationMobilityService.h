@@ -48,6 +48,11 @@ struct SubscriptionLinkList
     std::vector<std::string> subscriptionType; // 0 = RESERVED, 1 = MOBILITY_PORCEDURE, 2 = ADJACENT_APPINDO
 };
 
+struct SubscriptionInfo {
+    unsigned int subId;
+    unsigned int counter = 0;
+};
+
 class ApplicationMobilityService : public MecServiceBase2
 {
   std::string baseUriServiceRegistration_;
@@ -66,7 +71,7 @@ class ApplicationMobilityService : public MecServiceBase2
 
   // there could be more than one hms linked to a single ams
   std::map<int, std::string> hmsSockIdToMecHost;   // socketId-mecHostName
-  std::map<std::string, int> hmsSubIds_;     // mapping bw mecHostName and subId of hostMobilitySubscription to hms on that mec host
+  std::map<std::string, SubscriptionInfo> hmsSubIds_;     // mapping bw mecHostName and subId of hostMobilitySubscription to hms on that mec host
 
   protected:
     std::map<int, inet::ChunkQueue> socketQueue;

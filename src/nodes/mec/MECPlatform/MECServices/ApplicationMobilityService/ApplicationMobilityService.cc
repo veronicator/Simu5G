@@ -231,7 +231,7 @@ void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *cur
         try {
             request = nlohmann::json::parse(body);
         } catch (nlohmann::detail::parse_error e) {
-            std::cout << "ApplicationMobilityService::handlePOSTRequest" << e.what() << "\n" << body << std::endl;
+            EV << "ApplicationMobilityService::handlePOSTRequest" << e.what() << "\n" << body << std::endl;
             // body is not correctly formatted in JSON, manage it
             Http::send400Response(socket); // bad body JSON
             return;
@@ -255,28 +255,20 @@ void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *cur
         Http::send201Response(socket, response.dump(2).c_str(), p);
 
         if (rnisSocket_ != nullptr) {
-            // send RNIS CellChangeSubscription
+            // send RNIS CellChangeSubscription for ue mobility update
             sendCellChangeSubscription(regInfo->getDeviceInformation()[0].getAssociateId());
 
         }
         // if the registration request comes from a mecApp on a mobileMecHost -> subscribe to HostMobilityNotification
         if (regInfo->isMobileMecHost()) {  // serving mec host is mobile
             bool hmsConnected = false;
-            if (hmsSubIds_.find(regInfo->getMecHostName()) != hmsSubIds_.end()){
-//            if (hmsSockIdToMecHost.find(socket->getSocketId()) != hmsSockIdToMecHost.end()) {
+            auto hmsSubscription = hmsSubIds_.find(regInfo->getMecHostName());
+            if (hmsSubscription != hmsSubIds_.end()){
                 // the connection with the hms of interest is already set
                 hmsConnected = true;
-//                sendHostMobilitySubscription(socket, false);
+                hmsSubscription->second.counter++;
             }
 
-//            for (auto sockId: hmsSockIdToMecHost) {
-//                if (sockId.second == regInfo->getMecHostName()) {
-//                    // HostMobilityService on serving mec host of interest already connected
-//                    hmsConnected = true;
-//                    sendHostMobilitySubscription(socket, false);
-//                    break;
-//                }
-//            }
             if (!hmsConnected)
                 connectToHms(regInfo->getMecHostName());
         }
@@ -287,7 +279,7 @@ void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *cur
         try {
             request = nlohmann::json::parse(body);
         } catch (nlohmann::detail::parse_error e) {
-            std::cout << "AMS::handlePOSTRequest" << e.what() << "\n" << body << std::endl;
+            EV << "AMS::handlePOSTRequest" << e.what() << "\n" << body << std::endl;
             // body is not correctly formatted in JSON, manage it
             Http::send400Response(socket); // bad body JSON
             return;
@@ -321,7 +313,7 @@ void ApplicationMobilityService::handlePOSTRequest(const HttpRequestMessage *cur
         try {
             request = nlohmann::json::parse(body);
         } catch (nlohmann::detail::parse_error e) {
-            std::cout << "ApplicationMobilityService::handlePOSTRequest" << e.what() << "\n" << body << std::endl;
+            EV << "ApplicationMobilityService::handlePOSTRequest" << e.what() << "\n" << body << std::endl;
             // body is not correctly formatted in JSON, manage it
             Http::send400Response(socket); // bad body JSON
             return;
@@ -356,7 +348,7 @@ void ApplicationMobilityService::handlePUTRequest(const HttpRequestMessage *curr
         try {
             request = nlohmann::json::parse(currentRequestMessageServed->getBody());
         } catch (nlohmann::detail::parse_error e) {
-            std::cout << "AMS::handlePUTRequest" << e.what() << "\n" << currentRequestMessageServed->getBody() << std::endl;
+            EV << "AMS::handlePUTRequest" << e.what() << "\n" << currentRequestMessageServed->getBody() << std::endl;
             // body is not correctly formatted in JSON, manage it
             Http::send400Response(socket); // bad body JSON
             return;
@@ -402,7 +394,7 @@ void ApplicationMobilityService::handlePUTRequest(const HttpRequestMessage *curr
         try {
             request = nlohmann::json::parse(currentRequestMessageServed->getBody());
         } catch (nlohmann::detail::parse_error e) {
-            std::cout << "AMS::handlePUTRequest" << e.what() << "\n" << currentRequestMessageServed->getBody() << std::endl;
+            EV << "AMS::handlePUTRequest" << e.what() << "\n" << currentRequestMessageServed->getBody() << std::endl;
             // body is not correctly formatted in JSON, manage it
             Http::send400Response(socket); // bad body JSON
             return;
@@ -464,17 +456,21 @@ void ApplicationMobilityService::handleDELETERequest(const HttpRequestMessage *c
         if (regInfo != nullptr) {
             if (regInfo->isMobileMecHost()){
                 // unsubscribe to HostMobilityService notifications
-                auto subIdIt = hmsSubIds_.find(regInfo->getMecHostName());
-                if (subIdIt != hmsSubIds_.end()) {
-                    int hmsSubId = subIdIt->second;
-                    std::string hmsUri = "/example/hms/v1/subscriptions/" + std::to_string(hmsSubId);
-                    for (auto elem: hmsSockIdToMecHost) {
-                        if (elem.second.compare(regInfo->getMecHostName()) == 0) {
-                            int sockId = elem.first;
-                            inet::TcpSocket *hmsSocket = static_cast<inet::TcpSocket *>(socketMap.getSocketById(sockId));
-                            std::string host = hmsSocket->getRemoteAddress().str() + ":" + std::to_string(hmsSocket->getRemotePort());
-                            Http::sendDeleteRequest(hmsSocket, host.c_str(), hmsUri.c_str());
-                            hmsSubIds_.erase(regInfo->getMecHostName());
+                auto subscriptionElem = hmsSubIds_.find(regInfo->getMecHostName());
+                if (subscriptionElem != hmsSubIds_.end()) {
+                    subscriptionElem->second.counter--;
+                    // more than 1 app instance
+                    if (subscriptionElem->second.counter == 0) {
+                        int hmsSubId = subscriptionElem->second.subId;
+                        std::string hmsUri = "/example/hms/v1/subscriptions/" + std::to_string(hmsSubId);
+                        for (auto elem: hmsSockIdToMecHost) {
+                            if (elem.second.compare(regInfo->getMecHostName()) == 0) {
+                                int sockId = elem.first;
+                                inet::TcpSocket *hmsSocket = static_cast<inet::TcpSocket *>(socketMap.getSocketById(sockId));
+                                std::string host = hmsSocket->getRemoteAddress().str() + ":" + std::to_string(hmsSocket->getRemotePort());
+                                Http::sendDeleteRequest(hmsSocket, host.c_str(), hmsUri.c_str());
+                                hmsSubIds_.erase(regInfo->getMecHostName());
+                            }
                         }
                     }
                 }
@@ -633,7 +629,7 @@ void ApplicationMobilityService::handleHmsRequestMessage(const HttpRequestMessag
     try {
         jsonBody = nlohmann::json::parse(request->getBody());
     } catch (nlohmann::detail::parse_error e) {
-        std::cout << "AMS::handleHmsRequestMessage" << e.what() << "\n" << request->getBody() << std::endl;
+        EV << "AMS::handleHmsRequestMessage" << e.what() << "\n" << request->getBody() << std::endl;
         // body is not correctly formatted in JSON
         return;
     }
@@ -661,17 +657,19 @@ void ApplicationMobilityService::handleHmsResponseMessage(const HttpResponseMess
        try {
            jsonBody = nlohmann::json::parse(response->getBody());
        } catch (nlohmann::detail::parse_error e) {
-           std::cout << "AMS::handleHmsResponseMessage" << e.what() << "\n" << response->getBody() << std::endl;
+           EV << "AMS::handleHmsResponseMessage" << e.what() << "\n" << response->getBody() << std::endl;
            // body is not correctly formatted in JSON
            return;
        }
        if(!jsonBody.empty()) {
-           unsigned int subId = jsonBody["subscriptionId"];
+           SubscriptionInfo subInfo;
+           subInfo.subId = jsonBody["subscriptionId"];
+           subInfo.counter = 1;
            std::string mecHostName = jsonBody["mecHostName"];
-           hmsSubIds_.insert({mecHostName, subId});
+           hmsSubIds_.insert({mecHostName, subInfo});
 
            EV << "ApplicationMobilityService::handleHmsResponseMessage - jsonBody: " << jsonBody
-                   << "\nsubId: " << std::to_string(subId) << endl;
+                   << "\nsubId: " << std::to_string(subInfo.subId) << endl;
        }
     }
     else if(response->getCode() == 204) {
@@ -718,7 +716,7 @@ void ApplicationMobilityService::handleRnisRequestMessage(const HttpRequestMessa
     try {
         jsonBody = nlohmann::json::parse(request->getBody());
     } catch (nlohmann::detail::parse_error e) {
-        std::cout << "AMS::handleRnisRequestMessage" << e.what() << "\n" << request->getBody() << std::endl;
+        EV << "AMS::handleRnisRequestMessage" << e.what() << "\n" << request->getBody() << std::endl;
         // body is not correctly formatted in JSON
         return;
     }
@@ -744,7 +742,7 @@ void ApplicationMobilityService::handleRnisResponseMessage(const HttpResponseMes
        try {
            jsonBody = nlohmann::json::parse(response->getBody());
        } catch (nlohmann::detail::parse_error e) {
-           std::cout << "AMS::handleRnisResponseMessage" << e.what() << "\n" << response->getBody() << std::endl;
+           EV << "AMS::handleRnisResponseMessage" << e.what() << "\n" << response->getBody() << std::endl;
            // body is not correctly formatted in JSON
            return;
        }
