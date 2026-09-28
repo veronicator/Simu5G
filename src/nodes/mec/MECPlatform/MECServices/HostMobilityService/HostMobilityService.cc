@@ -342,7 +342,7 @@ void HostMobilityService::handleCellChangeNotification(const nlohmann::ordered_j
 
 //        if (eraseElem > 0)
             // update serving/coverage area -> msg to meo
-            mecPlatformManager_->updateServigArea(meHost_->getName(), srcEcgi.getCellId(), trgEcgi.getCellId());
+            mecPlatformManager_->updateServingArea(meHost_->getName(), srcEcgi.getCellId(), trgEcgi.getCellId());
         }
     }
 

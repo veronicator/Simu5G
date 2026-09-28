@@ -276,8 +276,8 @@ void MecPlatformManager::registerMecService(ServiceDescriptor& serviceDescriptor
         mecOrchestrator->registerMecService(serviceDescriptor);
 }
 
-void MecPlatformManager::updateServigArea(std::string mecHostName, MacNodeId srcCell, MacNodeId trgCell) {
-    Enter_Method_Silent("MecPlatformManager::updateServigArea");
+void MecPlatformManager::updateServingArea(std::string mecHostName, MacNodeId srcCell, MacNodeId trgCell) {
+    Enter_Method_Silent("MecPlatformManager::updateServingArea");
 
     EV << "MecPlatformManager::updateServigArea" << endl;
 

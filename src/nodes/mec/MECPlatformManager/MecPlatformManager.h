@@ -137,7 +137,7 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     /*
      * method to update the serving area of the mobile MEC host performing the handover
      */
-    void updateServigArea(std::string mecHostName, MacNodeId srcCell, MacNodeId trgCell);
+    void updateServingArea(std::string mecHostName, MacNodeId srcCell, MacNodeId trgCell);
     void manageUpdateServingAreaResponse(cMessage *msg);
 
     inet::L3Address getMepmAddress() {
