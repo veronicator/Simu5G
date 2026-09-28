@@ -25,6 +25,9 @@ Define_Module(MecPlatformManager);
 void MecPlatformManager::initialize(int stage)
 {
     EV << "MecPlatformManager::initialize - stage " << stage << endl;
+    delayUpdateAreaSignal_ = registerSignal("delayUpdateServingArea");
+    migrationPktSizeSignal_ = registerSignal("migrationPktSize");
+
     cSimpleModule::initialize(stage);
     // avoid multiple initializations
     if (stage == inet::INITSTAGE_LOCAL) {
@@ -179,10 +182,18 @@ void MecPlatformManager::triggerMecAppsMigration(simtime_t startMigration, std::
     migrateMsg->setTimestamp(startMigration);
     migrateMsg->setAppInstanceIds(appInstanceIds);
     migrateMsg->setTrgCellId(trgEcgi);
-    inet::B msgSize = inet::B(48 + strlen(migrateMsg->getType()) + sizeof(appInstanceIds));
+    int vecSize = 0;
+    for (auto instanceId: appInstanceIds)
+        vecSize += strlen(instanceId.c_str());
+
+    inet::B msgSize = inet::B(48 + strlen(migrateMsg->getType()) + vecSize);    // sizeof(appInstanceIds)
     migrateMsg->setChunkLength(msgSize);
 
+    std::cout << "\nmepm::triggerMecAppsMigration -> appInstanceIds size: " << vecSize << endl;
+
     newPkt->insertAtBack(migrateMsg);
+    auto pktSize = newPkt->getByteLength();
+    emit(migrationPktSizeSignal_, pktSize);
     meoSocket_.send(newPkt);
 }
 
@@ -281,6 +292,8 @@ void MecPlatformManager::updateServingArea(std::string mecHostName, MacNodeId sr
 
     EV << "MecPlatformManager::updateServigArea" << endl;
 
+    startUpdateServingArea = simTime();
+
     auto updateMsg = inet::makeShared<UpdateServingAreaMessage>();
     updateMsg->setType(UPDATE_SERVING_AREA);
     updateMsg->setMecHostName(mecHostName.c_str());
@@ -325,6 +338,8 @@ void MecPlatformManager::manageUpdateServingAreaResponse(cMessage *msg) {
 
     if(responseMsg->getStatus()) {
         // update serving area ok
+        simtime_t delayUpdate = simTime() - startUpdateServingArea;
+        emit(delayUpdateAreaSignal_, delayUpdate);
         // notify the correct update to HMS
         if (hms != nullptr)
             hms->handleHostMobilityUpdate(responseMsg->getSrcCellId(), responseMsg->getTrgCellId());

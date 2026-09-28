@@ -37,6 +37,12 @@ simple MecPlatformManager
         string vimModule = default("^.vim");
         @display("i=block/control");
 
+        @signal[delayUpdateServingArea];
+    	@statistic[delayUpdateServingArea](title="delay update mec host serving area"; unit="s"; source="delayUpdateServingArea"; record=last,mean,vector);
+		
+		@signal[migrationPktSize];
+    	@statistic[migrationPktSize](title="migration packet size"; unit="B"; source="migrationPktSize"; record=last,mean,vector);
+
     gates:
         output socketOut;
         input socketIn;

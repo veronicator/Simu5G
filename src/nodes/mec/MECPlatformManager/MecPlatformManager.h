@@ -46,6 +46,11 @@ class LocationService;
 
 class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallback
 {
+    simsignal_t delayUpdateAreaSignal_;
+    simsignal_t migrationPktSizeSignal_;
+
+    simtime_t startUpdateServingArea;
+
   protected:
     inet::ModuleRefByPar<MecOrchestrator> mecOrchestrator;
     inet::ModuleRefByPar<VirtualisationInfrastructureManager> vim;
