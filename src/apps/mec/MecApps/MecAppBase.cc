@@ -364,7 +364,7 @@ void MecAppBase::handleAmsMessage(int connId) {
             EV << "MecAppBase::handleAmsMessage - Received response - payload: " << " " << amsHttpMessage->getBody() << endl;
             HttpResponseMessage* amsResponse = check_and_cast<HttpResponseMessage*>(amsHttpMessage);
 
-            if (amsResponse->getCode() == 200) {
+            if (amsResponse->getCode() == 201) {
                 nlohmann::json jsonBody = nlohmann::json::parse(amsResponse->getBody());
                 if(!jsonBody.empty()){
                     if(jsonBody.contains("appMobilityServiceId"))
@@ -391,8 +391,7 @@ void MecAppBase::handleAmsMessage(int connId) {
                 }
             }
             else if (amsResponse->getCode() == 204) {
-                // vim -> delete app
-                std::cout << "MecAppBase::handleAmsMessage - Received response 204" << endl;
+//                std::cout << "MecAppBase::handleAmsMessage - Received response 204" << endl;
                 // response of deleteRequest - service deregistration
                 if (mobilityAware_ && !amsRegistration_)
                     vim->terminateMecApp(mecAppId);
@@ -401,7 +400,7 @@ void MecAppBase::handleAmsMessage(int connId) {
                 // this should not happen
             }
         }
-        else{
+        else {
             EV << "MecAppBase::handleAmsMessage - Message type not recognized " << endl;
 
         }
@@ -595,7 +594,6 @@ void MecAppBase::removeServiceRegistrations() {
 
     Enter_Method_Silent("MecServiceBase::removeSubscriptions");
     EV << "MecAppBase::removeServiceRegistrations" << endl;
-    std::cout << "MecAppBase::removeServiceRegistrations" << endl;
 
     if (mobilityAware_ && amsRegistration_) {
         std::string uri = "/example/amsi/v1/app_mobility_services/" + amsRegistrationId;
