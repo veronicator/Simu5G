@@ -25,6 +25,7 @@ Define_Module(MecPlatformManager);
 void MecPlatformManager::initialize(int stage)
 {
     EV << "MecPlatformManager::initialize - stage " << stage << endl;
+    meoConnectionTimeSignal_ = registerSignal("meoConnectionTime");
     delayUpdateAreaSignal_ = registerSignal("delayUpdateServingArea");
     migrationPktSizeSignal_ = registerSignal("migrationPktSize");
 
@@ -74,6 +75,7 @@ void MecPlatformManager::initialize(int stage)
         else {
             EV << "Connecting to " << meoAddress_ << " port=" << meoDestPort_ << endl;
             meoSocket_.connect(meoAddress_, meoDestPort_);
+            startMeoConnection = simTime();
         }
 
     }
@@ -116,6 +118,14 @@ void MecPlatformManager::socketDataArrived(inet::TcpSocket *socket, inet::Packet
             else
                 EV << "MecPlatformManager::socketDataArrived - Unexpected type data: " << meoMsg->getType() << endl;
         }
+    }
+}
+
+void MecPlatformManager::socketEstablished(inet::TcpSocket *socket) {
+    if (socket->getSocketId() == meoSocket_.getSocketId()) {
+
+        simtime_t connectionTime = simTime() - startMeoConnection;
+        emit(meoConnectionTimeSignal_, connectionTime);
     }
 }
 

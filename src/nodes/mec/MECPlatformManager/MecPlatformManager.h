@@ -46,9 +46,13 @@ class LocationService;
 
 class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallback
 {
+    // time to establish a connection with MEO
+    simsignal_t meoConnectionTimeSignal_;
+    // delay to update mec host serving area at the MEO
     simsignal_t delayUpdateAreaSignal_;
     simsignal_t migrationPktSizeSignal_;
 
+    simtime_t startMeoConnection;
     simtime_t startUpdateServingArea;
 
   protected:
@@ -72,7 +76,7 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     /* inet::TcpSocket::CallbackInterface callback methods */
     void socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bool urgent) override;
     void socketAvailable(inet::TcpSocket *socket, inet::TcpAvailableInfo *availableInfo) override { socket->accept(availableInfo->getNewSocketId()); }
-    void socketEstablished(inet::TcpSocket *socket) override {}
+    void socketEstablished(inet::TcpSocket *socket) override;
     void socketPeerClosed(inet::TcpSocket *socket) override {}
     void socketClosed(inet::TcpSocket *socket) override {}
     void socketFailure(inet::TcpSocket *socket, int code) override {}

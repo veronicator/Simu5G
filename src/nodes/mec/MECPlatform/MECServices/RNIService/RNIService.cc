@@ -83,6 +83,8 @@ void RNIService::receiveHandoverSignal(MacNodeId nodeId, MacNodeId srcCellId, Ma
         TimeStamp ts = new TimeStamp();
         ts.setSeconds();
         notificationBody_["timeStamp"] = ts.toJson();
+        notificationBody_["sendingTime"] = simTime().str();
+
         nlohmann::ordered_json associateId;
         associateId["type"] = "UE_IPv4_ADDRESS";    // other types are not managed yet
         associateId["value"] = ipAddress.str();

@@ -37,6 +37,9 @@ simple MecPlatformManager
         string vimModule = default("^.vim");
         @display("i=block/control");
 
+        @signal[meoConnectionTime];
+    	@statistic[meoConnectionTime](title="connection time mec host - mec orchestrator"; unit="s"; source="meoConnectionTime"; record=last,mean,vector);
+		
         @signal[delayUpdateServingArea];
     	@statistic[delayUpdateServingArea](title="delay update mec host serving area"; unit="s"; source="delayUpdateServingArea"; record=last,mean,vector);
 		

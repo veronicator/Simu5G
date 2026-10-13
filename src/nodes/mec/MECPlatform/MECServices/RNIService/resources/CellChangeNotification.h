@@ -27,12 +27,14 @@ public:
     HoStatus getHoStatus() const {return hoStatus_;}
     Ecgi getSrcEcgi() const {return srcEcgi_;}
     Ecgi getTrgEcgi() const {return trgEcgi_;}
+    simtime_t getSendingTime() {return sendingTime;}
     
 private:
     HoStatus hoStatus_;
     Ecgi srcEcgi_;
     Ecgi trgEcgi_;
     //missing tempUeId, however it is optional
+    simtime_t sendingTime;
 
 };
 

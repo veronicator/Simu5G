@@ -23,8 +23,7 @@ nlohmann::ordered_json CellChangeNotification::toJson() const
     nlohmann::ordered_json val;
     val["notificationType"] = notificationType_;
     val["associateId"] = nlohmann::json::array();
-    for(auto it = associateId_.begin(); it != associateId_.end(); it++)
-    {
+    for(auto it = associateId_.begin(); it != associateId_.end(); it++) {
         val["associateId"].push_back(it->toJson());
     }
     val["hoStatus"] = FilterCriteriaAssocHo::getHoStatusString(hoStatus_);
@@ -55,6 +54,11 @@ bool CellChangeNotification::fromJson(const nlohmann::ordered_json& json)
     {
         EV << "CellChangeNotification::fromJson - missing mandatory fields" << endl;
         return false;
+    }
+
+    if (json.contains("sendingTime")) {
+        std::string sendTime = json["sendingTime"];
+        sendingTime = SimTime::parse(sendTime.c_str());
     }
 
     

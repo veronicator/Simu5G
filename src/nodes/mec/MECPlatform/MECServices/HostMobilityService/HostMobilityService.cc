@@ -25,6 +25,8 @@ HostMobilityService::~HostMobilityService() {
 void HostMobilityService::initialize(int stage)
 {
     EV << "HMS::Initializing..." << endl;
+    cellChangeSubscriptionDelaySignal_ = registerSignal("cellChangeSubscriptionDelay");
+    cellChangeNotificationDelaySignal_ = registerSignal("cellChangeNotificationDelay");
 
     MecServiceBase2::initialize(stage);
 
@@ -78,10 +80,6 @@ void HostMobilityService::handleMessage(cMessage *msg) {
                     inet::L3Address rnisAddr = L3AddressResolver().resolve(address.c_str());
                     EV << "HostMobilityService::connectRnis - rnisInfo addr: " << address << " port: " << rnisInfo["transportInfo"]["endPoint"]["addresses"]["port"] << endl;
                     rnisSocket_->connect(rnisAddr, rnisInfo["transportInfo"]["endPoint"]["addresses"]["port"]);
-
-                    // schedule msg for sending cellChangeSubscription
-                    cMessage *m = new cMessage("sendCellChangeSubscription");
-                    scheduleAt(simTime() + 0.1, m);
                 }
                 else {
                     EV << "HostMobilityService::connectRnis - RNIService not found" << endl;
@@ -92,6 +90,8 @@ void HostMobilityService::handleMessage(cMessage *msg) {
                 EV << "HostMobilityService::handleMessage - mecPlatformManager_ is null " << endl;
         }
         else if (strcmp(msg->getName(), "sendCellChangeSubscription") == 0) {
+            sendingCellChangeSubscriptionDelay = simTime();
+
             std::string uristring = "/example/rni/v2/subscriptions";
             std::string host = rnisSocket_->getRemoteAddress().str() + ":" + std::to_string(rnisSocket_->getRemotePort());
 
@@ -246,6 +246,14 @@ void HostMobilityService::socketDataArrived(inet::TcpSocket *socket, inet::Packe
     delete msg;
 }
 
+void HostMobilityService::socketEstablished(inet::TcpSocket *socket) {
+    if (rnisSocket_ != nullptr && socket->getSocketId() == rnisSocket_->getSocketId()) {
+        // schedule msg for sending cellChangeSubscription
+        cMessage *m = new cMessage("sendCellChangeSubscription");
+        scheduleAt(simTime(), m);
+    }
+}
+
 void HostMobilityService::handleRnisMessage(cMessage *msg) {
     EV_INFO << "HostMobilityService::handleRnisMessage - parsing message from Rnis" << endl;
     inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
@@ -292,9 +300,13 @@ void HostMobilityService::handleRnisResponseMessage(const HttpResponseMessage *r
        EV << "HostMobilityService::handling RNI response - subscription ok: " << response->getBody() << endl;
        nlohmann::json jsonBody = nlohmann::json::parse(response->getBody());
        if(!jsonBody.empty()) {
-           // Correct subscription
-           std::stringstream stream;
-           cellChangeSubId_ = jsonBody["subscriptionId"];
+           if (jsonBody["subscriptionType"] == "CellChangeSubscription") {
+               // Correct subscription
+               std::stringstream stream;
+               cellChangeSubId_ = jsonBody["subscriptionId"];
+               simtime_t subTime = simTime() - sendingCellChangeSubscriptionDelay;
+               emit(cellChangeSubscriptionDelaySignal_, subTime);
+           }
 
            EV << "HostMobilityService::handling Rnis response - jsonBody: " << jsonBody << endl;
        }
@@ -323,6 +335,9 @@ void HostMobilityService::handleCellChangeNotification(const nlohmann::ordered_j
     bool res = cellChangeNotification->fromJson(request);
     if (res) {
         EV << "Cell Change Notification processed: " << cellChangeNotification->toJson() << endl;
+
+        simtime_t delayNotification = simTime() - cellChangeNotification->getSendingTime();
+        emit(cellChangeNotificationDelaySignal_, delayNotification);
 
         Ecgi srcEcgi = cellChangeNotification->getSrcEcgi();
         Ecgi trgEcgi = cellChangeNotification->getTrgEcgi();

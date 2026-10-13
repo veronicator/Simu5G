@@ -22,6 +22,10 @@ using namespace omnetpp;
 
 class HostMobilityService : public MecServiceBase2
 {
+    simsignal_t cellChangeSubscriptionDelaySignal_;
+    simtime_t sendingCellChangeSubscriptionDelay;
+
+    simsignal_t cellChangeNotificationDelaySignal_;
 
     std::string callbackRefUri_; // uri used to receive notification from RNI service
     // socket to communicate with RNIS
@@ -49,6 +53,7 @@ class HostMobilityService : public MecServiceBase2
     void handleDELETERequest(const HttpRequestMessage *currentRequestMessageServed, inet::TcpSocket *socket) override;
 
     void socketDataArrived(inet::TcpSocket *socket, inet::Packet *packet, bool urgent) override;
+    void socketEstablished(inet::TcpSocket *socket) override;
 
     void handleRnisMessage(cMessage *msg);
     void handleRnisRequestMessage(const HttpRequestMessage *msg);

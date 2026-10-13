@@ -61,6 +61,12 @@ simple HostMobilityService like IMECService, IApp
         @signal[responseTime];
         @statistic[responseTimeStat](title="Response time of foreground requests"; source="responseTime"; record=mean,vector);
 
+        @signal[cellChangeSubscriptionDelay];
+        @statistic[cellChangeSubscriptionDelay](title="Cell change subscription delay"; unit="s"; source="cellChangeSubscriptionDelay"; record=last,mean,vector);
+
+        @signal[cellChangeNotificationDelay];
+        @statistic[cellChangeNotificationDelay](title="Cell change notification delay"; unit="s"; source="cellChangeNotificationDelay"; record=last,mean,vector);
+
     gates:
         input socketIn @labels(TcpCommand/up);
         output socketOut @labels(TcpCommand/down);
