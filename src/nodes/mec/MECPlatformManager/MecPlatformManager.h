@@ -135,11 +135,7 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     void registerMecServiceReference(MecServiceBase *mecService, std::string mecServiceName);
 
     // HMS
-    /*
-     * method called by the HMS to register its reference ptr to mepm
-     */
-    void registerHostMobilityService(HostMobilityService *mecService) { hms = mecService; }
-    /*
+     /*
      * method to update the serving area of the mobile MEC host performing the handover
      */
     void updateServingArea(std::string mecHostName, MacNodeId srcCell, MacNodeId trgCell);

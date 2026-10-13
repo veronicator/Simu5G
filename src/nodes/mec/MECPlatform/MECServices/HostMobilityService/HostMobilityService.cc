@@ -32,7 +32,6 @@ void HostMobilityService::initialize(int stage)
         baseSubscriptionLocation_ = host_ + baseUriSubscriptions_ + "/";
 
         // register hms reference ptr to mepm
-//        mecPlatformManager_->registerHostMobilityService(this);
         mecPlatformManager_->registerMecServiceReference(this, serviceName_);
 //        // register to the MEO
 //        cMessage *m = new cMessage("registerToMeo");
