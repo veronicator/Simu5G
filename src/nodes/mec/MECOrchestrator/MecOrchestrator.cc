@@ -1020,6 +1020,23 @@ void MecOrchestrator::getCellMecHostsConnections() {
     }
 }
 
+bool MecOrchestrator::isMecHostServingCell(const std::string& mecHostName, MacNodeId cellId) const
+{
+    Enter_Method_Silent("MecOrchestrator::isMecHostServingCell");
+
+    auto cellIt = cellToMecHosts.find(cellId);
+    if (cellIt == cellToMecHosts.end())
+        return false;
+
+    for (const cModule *host : cellIt->second) {
+        if (host != nullptr &&
+                (mecHostName == host->getFullPath() || mecHostName == host->getName()))
+            return true;
+    }
+
+    return false;
+}
+
 const ApplicationDescriptor& MecOrchestrator::onboardApplicationPackage(const char *fileName)
 {
     EV << "MecOrchestrator::onBoardApplicationPackages - onboarding application package (from request): " << fileName << endl;
@@ -1130,4 +1147,3 @@ const ApplicationDescriptor *MecOrchestrator::getApplicationDescriptorByAppName(
 }
 
 } //namespace
-

@@ -297,6 +297,15 @@ void MecPlatformManager::registerMecService(ServiceDescriptor& serviceDescriptor
         mecOrchestrator->registerMecService(serviceDescriptor);
 }
 
+bool MecPlatformManager::isMecHostServingCell(const std::string& mecHostName, MacNodeId cellId) const
+{
+    Enter_Method_Silent("MecPlatformManager::isMecHostServingCell");
+    if (mecOrchestrator == nullptr)
+        throw cRuntimeError("MecPlatformManager::isMecHostServingCell - MECOrchestrator is not available");
+
+    return mecOrchestrator->isMecHostServingCell(mecHostName, cellId);
+}
+
 void MecPlatformManager::updateServingArea(std::string mecHostName, MacNodeId srcCell, MacNodeId trgCell) {
     Enter_Method_Silent("MecPlatformManager::updateServingArea");
 
@@ -358,4 +367,3 @@ void MecPlatformManager::manageUpdateServingAreaResponse(cMessage *msg) {
 }
 
 } //namespace
-

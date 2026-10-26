@@ -132,6 +132,7 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
      * method called by the MEC service to notify its presence to the MEC system
      */
     void registerMecService(ServiceDescriptor&) const;
+    bool isMecHostServingCell(const std::string& mecHostName, MacNodeId cellId) const;
 
     /*
      * method called by the Mec Service to register its reference ptr to mepm
@@ -153,4 +154,3 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
 } //namespace
 
 #endif
-

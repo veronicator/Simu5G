@@ -34,6 +34,8 @@ simple ApplicationMobilityService like IMECService, IApp
     double requestServiceTime  @unit(s) = default(0.5us);
     double subscriptionServiceTime @unit(s) = default(0.5us);
 
+    double waitingTimeTriggerMigration @unit(s) = default(0.0ms);
+
     string serviceName = default("ApplicationMobilityService");
    	string serviceVersion = default("v1");
    	string serviceSerialize = default("JSON");

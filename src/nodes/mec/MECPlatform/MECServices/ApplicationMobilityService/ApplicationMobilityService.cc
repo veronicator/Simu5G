@@ -23,6 +23,21 @@ namespace simu5g {
 Define_Module(ApplicationMobilityService);
 
 
+class TimerMigrationTriggerMessage : public cMessage {
+public:
+    simtime_t arrivalNotificationTime;
+    std::string mecHostAddress;
+    MacNodeId srcCellId;
+
+    TimerMigrationTriggerMessage(simtime_t time, std::string hostAddress, MacNodeId cellId)
+        : cMessage("timerTriggerAppMigration"),
+          arrivalNotificationTime(time),
+          mecHostAddress(std::move(hostAddress)),
+          srcCellId(cellId)
+    {
+    }
+};
+
 ApplicationMobilityService::ApplicationMobilityService()
 {
     registrationResources_ = new ApplicationMobilityResource();
@@ -53,6 +68,7 @@ void ApplicationMobilityService::initialize(int stage)
     MecServiceBase2::initialize(stage);
 
     if (stage == inet::INITSTAGE_APPLICATION_LAYER) {
+        waitingTimeTriggerMigration_ = par("waitingTimeTriggerMigration");
         mecPlatformManager_->registerMecServiceReference(this, serviceName_);
 
         baseSubscriptionLocation_ = host_+ baseUriSubscriptions_ + "/";
@@ -142,6 +158,25 @@ void ApplicationMobilityService::handleMessage(cMessage *msg)
             }
             else
                 EV << "ApplicationMobilityService::handleMessage - mecPlatformManager_ is null " << endl;
+        }
+        else if (strcmp(msg->getName(), "timerTriggerAppMigration") == 0) {
+            if (auto *migration = dynamic_cast<TimerMigrationTriggerMessage *>(msg)) {
+                auto pending = pendingAppInstanceIdsByHost_.find(migration->mecHostAddress);
+                if (pending != pendingAppInstanceIdsByHost_.end()) {
+                    std::vector<std::string> appInstanceIds = std::move(pending->second);
+                    pendingAppInstanceIdsByHost_.erase(pending);
+                    if (!appInstanceIds.empty())
+                        mecPlatformManager_->triggerMecAppsMigration(simTime(), appInstanceIds, migration->srcCellId);
+                    else
+                        EV << "AMS::no app IDs remain to migrate for MEC host "
+                           << migration->mecHostAddress << endl;
+                }
+                else {
+                    EV_WARN << "AMS::no pending app IDs for MEC host "
+                            << migration->mecHostAddress << " when migration timer fired" << endl;
+                }
+//                delete migration;
+            }
         }
     }
     MecServiceBase::handleMessage(msg);
@@ -555,6 +590,7 @@ void ApplicationMobilityService::socketDataArrived(inet::TcpSocket *socket, inet
     }
     delete msg;
 }
+
 void ApplicationMobilityService::socketEstablished(inet::TcpSocket *socket) {
     if (hmsSockIdToMecHost.find(socket->getSocketId()) != hmsSockIdToMecHost.end()) {
         EV_DEBUG << "ApplicationMobilityService::socketEstablished - HMS socket" << endl;
@@ -605,7 +641,6 @@ void ApplicationMobilityService::handleHmsMessage(cMessage *msg, inet::TcpSocket
     auto response = dynamicPtrCast<const HttpResponseMessage>(baseMsg);
     if (response != nullptr) {
         EV_DEBUG << "ApplicationMobilityService::handleHmsMessage - RESPONSE" << endl;
-//        todo
         handleHmsResponseMessage(response.get(), socket);
         return;
     }
@@ -613,7 +648,6 @@ void ApplicationMobilityService::handleHmsMessage(cMessage *msg, inet::TcpSocket
     auto request = dynamicPtrCast<const HttpRequestMessage>(baseMsg);
     if (request != nullptr) {
         EV_DEBUG << "ApplicationMobilityService::handleHmsMessage - REQUEST" << endl;
-//        todo
         handleHmsRequestMessage(request.get(), socket);
         return;
     }
@@ -817,10 +851,11 @@ void ApplicationMobilityService::sendHostMobilitySubscription(inet::TcpSocket *s
 
     if (newReq)
         Http::sendPostRequest(socket, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
-    else {
-        // todo: find sub id to insert in the uri, then send puu request
-        Http::sendPutRequest(socket, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
-    }
+//    else {
+//        // todo: find sub id to insert in the uri, then send put request
+//        // not implemented yet
+//        Http::sendPutRequest(socket, subscriptionBody_.dump().c_str(), host.c_str(), uristring.c_str());
+//    }
 }
 
 void ApplicationMobilityService::sendCellChangeSubscription(AssociateId associateId) {
@@ -854,7 +889,7 @@ void ApplicationMobilityService::handleHostMobilityNotification(const nlohmann::
     HostMobilityNotification *hmsNotification = new HostMobilityNotification();
     bool res = hmsNotification->fromJson(request);
     if (res) {
-        simtime_t startMigrationTime = simTime();
+        simtime_t arrivalHmsNotificationTime = simTime();
         std::string servingHostName = hmsNotification->getMecHostName();
         std::string servingHostAddress = hmsNotification->getMecHostAddress();
         // source cell of serving mec host before handover -> should be target migration cell
@@ -862,10 +897,12 @@ void ApplicationMobilityService::handleHostMobilityNotification(const nlohmann::
         // target cell of mec host after handover
 //        MacNodeId trgCellId = hmsNotification->getTrgCellId();
 
-        // get instance id of mec apps to migrate
-        std::vector<std::string> appInstanceIds = registrationResources_->getAppInstanceIdsFromMecHostAddress(servingHostAddress);
+        pendingAppInstanceIdsByHost_[servingHostAddress] =
+            registrationResources_->getAppInstanceIdsFromMecHostAddress(servingHostAddress);
+        cMessage *m = new TimerMigrationTriggerMessage(arrivalHmsNotificationTime, std::move(servingHostAddress), srcCellId);
+        scheduleAt(simTime() + waitingTimeTriggerMigration_, m);
 
-        mecPlatformManager_->triggerMecAppsMigration(startMigrationTime, appInstanceIds, srcCellId);
+//        mecPlatformManager_->triggerMecAppsMigration(startMigrationTime, appInstanceIds, srcCellId);
     }
 
 }
@@ -888,9 +925,22 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
 
         EV << "AMS::CellChangeNotification - srcCellId " << srcEcgi.getCellId() << "; trgCellId " << trgEcgi.getCellId() << endl;
 
-        // more than one mec app instance associate to a single ue could be present
-        for (auto instanceId: appInstanceIds)
-            registrationInfo.push_back(registrationResources_->getRegistrationInfoFromAppId(instanceId));
+        for (const auto& instanceId : appInstanceIds) {
+            RegistrationInfo *regInfo = registrationResources_->getRegistrationInfoFromAppId(instanceId);
+            if (regInfo == nullptr)
+                continue;
+
+            // more than one mec app instance associate to a single ue could be present
+            registrationInfo.push_back(regInfo);
+
+            if (mecPlatformManager_->isMecHostServingCell(regInfo->getMecHostName(), trgEcgi.getCellId())) {
+                auto pending = pendingAppInstanceIdsByHost_.find(regInfo->getMecHostAddress());
+                if (pending != pendingAppInstanceIdsByHost_.end()) {
+                    auto& pendingIds = pending->second;
+                    pendingIds.erase(std::remove(pendingIds.begin(), pendingIds.end(), instanceId), pendingIds.end());
+                }
+            }
+        }
 
         for (auto regInfo: registrationInfo) {
             for (auto devInfo: regInfo->getDeviceInformation()) {

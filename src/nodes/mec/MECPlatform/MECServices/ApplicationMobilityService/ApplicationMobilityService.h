@@ -53,6 +53,7 @@ struct SubscriptionInfo {
     unsigned int counter = 0;
 };
 
+
 class ApplicationMobilityService : public MecServiceBase2
 {
   std::string baseUriServiceRegistration_;
@@ -62,6 +63,9 @@ class ApplicationMobilityService : public MecServiceBase2
   // id = id device
   // list of subscription for that device
   std::map<std::string, SubscriptionLinkList> subscriptionLinkList; // Not used so far..
+
+  double waitingTimeTriggerMigration_;
+  std::map<std::string, std::vector<std::string>> pendingAppInstanceIdsByHost_;
 
   int migrationCounter_;
   simsignal_t totalMigrationsSignal_;

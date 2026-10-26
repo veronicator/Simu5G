@@ -30,6 +30,7 @@ class HostMobilityService : public MecServiceBase2
     std::string callbackRefUri_; // uri used to receive notification from RNI service
     // socket to communicate with RNIS
     inet::TcpSocket *rnisSocket_ = nullptr;
+    bool localRnis = false;
 
     int cellChangeSubId_;
 

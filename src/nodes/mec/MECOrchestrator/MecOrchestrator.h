@@ -126,6 +126,7 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
      * @param ServiceDescriptor descriptor of the MEC service to register
      */
     void registerMecService(ServiceDescriptor&) const;
+    bool isMecHostServingCell(const std::string& mecHostName, MacNodeId cellId) const;
 
   protected:
 
@@ -154,6 +155,9 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     void stopMigratedMecApp(bool result, int ueAppId, int contextId);
 
     void migrateAllMecApps(cMessage *msg);
+    /**
+     * mec app migration triggered after mec host handover
+     */
     void migrateMecApps(cMessage *msg);
     void migrateMecApp(cMessage *msg);
     void handleMigrateAppAck(cMessage *msg);
@@ -226,4 +230,3 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
 } //namespace
 
 #endif
-

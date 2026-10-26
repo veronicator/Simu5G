@@ -66,8 +66,10 @@ void HostMobilityService::handleMessage(cMessage *msg) {
                     if (service.getName() == "RNIService") {
                         rnisInfo = service.toJson();
                         // if service is on the same mec host of the consumer
-                        if (service.getMecHost() == meHost_->getName())
+                        if (service.getMecHost() == meHost_->getName()) {
+                            localRnis = true;
                             break;
+                        }
                     }
                 }
                 if (!rnisInfo.empty()) {
@@ -124,7 +126,7 @@ void HostMobilityService::handlePOSTRequest(const HttpRequestMessage *currentReq
         try {
             request = nlohmann::json::parse(body);
         } catch (nlohmann::detail::parse_error e) {
-            std::cout << "HostMobilityService::handlePOSTRequest" << e.what() << "\n" << body << std::endl;
+            EV << "HostMobilityService::handlePOSTRequest" << e.what() << "\n" << body << std::endl;
             // body is not correctly formatted in JSON, manage it
             Http::send400Response(socket); // bad body JSON
             return;

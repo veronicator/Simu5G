@@ -40,7 +40,7 @@ module MecOrchestrator
         double onboardingTime @unit(s) = default(50ms);
         double instantiationTime @unit(s) = default(50ms);
         double terminationTime @unit(s) = default(50ms);
-        double removalWaitingTime @unit(s) = default(10s);
+        double removalWaitingTime @unit(s) = default(5s);
 
         bool hasIpv4 = default(true);
         bool hasIpv6 = default(false);
