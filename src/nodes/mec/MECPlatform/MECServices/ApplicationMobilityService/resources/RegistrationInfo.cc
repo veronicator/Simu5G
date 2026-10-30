@@ -66,6 +66,8 @@ nlohmann::ordered_json RegistrationInfo::toJson() const
     val["expireTime"] = expiryTime;
     val["serviceConsumerId"]["appInstanceId"] = serviceConsumerId.appInstanceId;
     val["serviceConsumerId"]["mepId"] = serviceConsumerId.mepId;
+    if (contextId >= 0)
+        val["contextId"] = contextId;
     val["mobileMecHost"] = mobileMecHost;
     val["mecHostAddress"] = mecHostAddress;
     val["mecHostName"] = mecHostName;
@@ -139,6 +141,7 @@ bool RegistrationInfo::fromJson(const nlohmann::ordered_json& object)
 
     serviceConsumerId.appInstanceId = object["serviceConsumerId"]["appInstanceId"];
     serviceConsumerId.mepId = object["serviceConsumerId"]["mepId"];
+    contextId = object.contains("contextId") ? object["contextId"].get<int>() : -1;
     return true;
 }
 
@@ -161,4 +164,3 @@ void RegistrationInfo::printRegistrationInfo()
 }
 
 }   // namespace
-

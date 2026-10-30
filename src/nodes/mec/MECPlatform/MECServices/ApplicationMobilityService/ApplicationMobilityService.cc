@@ -161,18 +161,18 @@ void ApplicationMobilityService::handleMessage(cMessage *msg)
         }
         else if (strcmp(msg->getName(), "timerTriggerAppMigration") == 0) {
             if (auto *migration = dynamic_cast<TimerMigrationTriggerMessage *>(msg)) {
-                auto pending = pendingAppInstanceIdsByHost_.find(migration->mecHostAddress);
-                if (pending != pendingAppInstanceIdsByHost_.end()) {
-                    std::vector<std::string> appInstanceIds = std::move(pending->second);
-                    pendingAppInstanceIdsByHost_.erase(pending);
-                    if (!appInstanceIds.empty())
-                        mecPlatformManager_->triggerMecAppsMigration(simTime(), appInstanceIds, migration->srcCellId);
+                auto pending = pendingContextIdsByHost_.find(migration->mecHostAddress);
+                if (pending != pendingContextIdsByHost_.end()) {
+                    std::vector<int> contextIds = std::move(pending->second);
+                    pendingContextIdsByHost_.erase(pending);
+                    if (!contextIds.empty())
+                        mecPlatformManager_->triggerMecAppsMigration(simTime(), contextIds, migration->srcCellId);
                     else
-                        EV << "AMS::no app IDs remain to migrate for MEC host "
+                        EV << "AMS::no app contexts remain to migrate for MEC host "
                            << migration->mecHostAddress << endl;
                 }
                 else {
-                    EV_WARN << "AMS::no pending app IDs for MEC host "
+                    EV_WARN << "AMS::no pending app contexts for MEC host "
                             << migration->mecHostAddress << " when migration timer fired" << endl;
                 }
 //                delete migration;
@@ -897,12 +897,11 @@ void ApplicationMobilityService::handleHostMobilityNotification(const nlohmann::
         // target cell of mec host after handover
 //        MacNodeId trgCellId = hmsNotification->getTrgCellId();
 
-        pendingAppInstanceIdsByHost_[servingHostAddress] =
-            registrationResources_->getAppInstanceIdsFromMecHostAddress(servingHostAddress);
+        pendingContextIdsByHost_[servingHostAddress] =
+            registrationResources_->getContextIdsFromMecHostAddress(servingHostAddress);
         cMessage *m = new TimerMigrationTriggerMessage(arrivalHmsNotificationTime, std::move(servingHostAddress), srcCellId);
         scheduleAt(simTime() + waitingTimeTriggerMigration_, m);
 
-//        mecPlatformManager_->triggerMecAppsMigration(startMigrationTime, appInstanceIds, srcCellId);
     }
 
 }
@@ -911,51 +910,88 @@ void ApplicationMobilityService::handleHostMobilityNotification(const nlohmann::
 void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::ordered_json& request) {
 
     EV << "AMS::CellChangeNotification received - trigger MecApp migration" << endl;
-    std::vector<RegistrationInfo *> registrationInfo;
 
     CellChangeNotification *cellChangeNotification = new CellChangeNotification();
     bool res = cellChangeNotification->fromJson(request);
     if (res) {
         EV << "Cell Change Notification processed: " << cellChangeNotification->toJson() << endl;
         auto associateIds = cellChangeNotification->getAssociateId();
-        std::vector<std::string> appInstanceIds = registrationResources_->getAppInstanceIds(associateIds);
 
         Ecgi srcEcgi = cellChangeNotification->getSrcEcgi();
         Ecgi trgEcgi = cellChangeNotification->getTrgEcgi();
 
         EV << "AMS::CellChangeNotification - srcCellId " << srcEcgi.getCellId() << "; trgCellId " << trgEcgi.getCellId() << endl;
 
-        for (const auto& instanceId : appInstanceIds) {
-            RegistrationInfo *regInfo = registrationResources_->getRegistrationInfoFromAppId(instanceId);
-            if (regInfo == nullptr)
-                continue;
+        for (const auto& ueAssociateId : associateIds) {
+            std::vector<int> migratableContextIds;
+            const auto appInstanceIds =
+                registrationResources_->getAppInstanceIds({ueAssociateId});
 
-            // more than one mec app instance associate to a single ue could be present
-            registrationInfo.push_back(regInfo);
-
-            if (mecPlatformManager_->isMecHostServingCell(regInfo->getMecHostName(), trgEcgi.getCellId())) {
-                auto pending = pendingAppInstanceIdsByHost_.find(regInfo->getMecHostAddress());
-                if (pending != pendingAppInstanceIdsByHost_.end()) {
-                    auto& pendingIds = pending->second;
-                    pendingIds.erase(std::remove(pendingIds.begin(), pendingIds.end(), instanceId), pendingIds.end());
-                }
-            }
-        }
-
-        for (auto regInfo: registrationInfo) {
-            for (auto devInfo: regInfo->getDeviceInformation()) {
-                if (devInfo.getAppMobilityServiceLevelString() == "APP_MOBILITY_NOT_ALLOWED") {
-                    EV << "AMS::CellChangeNotification - APP_MOBILITY_NOT_ALLOWED" << endl;
+            for (const auto& instanceId : appInstanceIds) {
+                RegistrationInfo *regInfo =
+                    registrationResources_->getRegistrationInfoFromAppId(instanceId);
+                if (regInfo == nullptr)
                     continue;
-                }
 
-                // app mobility allowed
-                for (auto ueAssociateId: associateIds) {   // in our simple case, associateIds is a vector with a single element
-                    if (devInfo.getAssociateId().getValue().compare(ueAssociateId.getValue()) == 0) {
-                        EV << "AMS::CellChangeNotification - trigger migration" << endl;
-                        mecPlatformManager_->triggerMecAppMigration(ueAssociateId, appInstanceIds, srcEcgi.getCellId(), trgEcgi.getCellId());
+                const int contextId = regInfo->getContextId();
+                if (contextId < 0)
+                    continue;
+
+                auto pending = pendingContextIdsByHost_.find(regInfo->getMecHostAddress());
+                bool pendingHostMigration = false;
+                bool hostAlreadyServesTarget = false;
+                if (pending != pendingContextIdsByHost_.end()) {
+                    auto& pendingIds = pending->second;
+                    pendingHostMigration =
+                        std::find(pendingIds.begin(), pendingIds.end(), contextId) != pendingIds.end();
+                    if (pendingHostMigration) {
+                        hostAlreadyServesTarget = mecPlatformManager_->isMecHostServingCell(
+                                regInfo->getMecHostName(), trgEcgi.getCellId());
+                        if (hostAlreadyServesTarget) {
+                            pendingIds.erase(std::remove(pendingIds.begin(), pendingIds.end(), contextId),
+                                    pendingIds.end());
+                            EV << "AMS::CellChangeNotification - contextId=" << contextId
+                               << " removed from pending host migration; current MEC host serves target cell"
+                               << endl;
+                        }
                     }
                 }
+
+                for (const auto& devInfo : regInfo->getDeviceInformation()) {
+                    const auto& registeredAssociateId = devInfo.getAssociateId();
+                    if (registeredAssociateId.getType() != ueAssociateId.getType() ||
+                            registeredAssociateId.getValue() != ueAssociateId.getValue())
+                        continue;
+
+                    if (hostAlreadyServesTarget)
+                        continue;
+
+                    if (devInfo.getAppMobilityServiceLevelString() == "APP_MOBILITY_NOT_ALLOWED") {
+                        EV << "AMS::CellChangeNotification - APP_MOBILITY_NOT_ALLOWED" << endl;
+                        continue;
+                    }
+
+                    if (pendingHostMigration) {
+                        auto& pendingIds = pending->second;
+                        pendingIds.erase(std::remove(pendingIds.begin(), pendingIds.end(), contextId),
+                                pendingIds.end());
+                        EV << "AMS::CellChangeNotification - contextId=" << contextId
+                           << " removed from pending host migration; issuing UE-specific migration" << endl;
+                        pendingHostMigration = false;
+                    }
+
+                    if (std::find(migratableContextIds.begin(), migratableContextIds.end(), contextId) ==
+                            migratableContextIds.end())
+                        migratableContextIds.push_back(contextId);
+                }
+            }
+
+            if (!migratableContextIds.empty()) {
+                EV << "AMS::CellChangeNotification - trigger migration for "
+                   << migratableContextIds.size() << " app context(s)" << endl;
+                mecPlatformManager_->triggerMecAppMigration(simTime(),
+                    ueAssociateId, migratableContextIds,
+                    srcEcgi.getCellId(), trgEcgi.getCellId());
             }
         }
     }

@@ -129,13 +129,15 @@ bool VirtualisationInfrastructureManager::instantiateEmulatedMEApp(CreateAppMess
     EV << "VirtualisationInfrastructureManager::instantiateEmulatedMEApp - processing..." << endl;
     //retrieve UE App ID
     int ueAppID = msg->getUeAppID();
+    int migrationId = msg->getMigrationId();
+    MecAppKey key{ueAppID, migrationId};
     const char *meModuleName = msg->getMEModuleName();
 
-    //checking if there are ME App slots available and if ueAppIdToMeAppMapKey map entry does not exist (that means ME App not already instantiated)
-    if (currentMEApps < maxMECApps && mecAppMap.find(ueAppID) == mecAppMap.end()) {
-        //creating ueAppIdToMeAppMapKey map entry
-        EV << "VirtualisationInfrastructureManager::instantiateEmulatedMEApp - ueAppIdToMeAppMapKey[" << ueAppID << "]" << endl;
-        int key = ueAppID;
+    // Check that a slot is available and this app generation is not already instantiated.
+    if (currentMEApps < maxMECApps && mecAppMap.find(key) == mecAppMap.end()) {
+        // Create the MEC app map entry using the UE app ID and migration generation.
+        EV << "VirtualisationInfrastructureManager::instantiateEmulatedMEApp - instance key ["
+           << ueAppID << ", " << migrationId << "]" << endl;
 
         double ram = msg->getRequiredRam();
         double disk = msg->getRequiredDisk();
@@ -165,11 +167,12 @@ bool VirtualisationInfrastructureManager::instantiateEmulatedMEApp(CreateAppMess
         //mecAppMap[key].ueAddress = ueAppAddress;
         //mecAppMap[key].uePort = ueAppPort;
         newAppEntry.ueAppID = ueAppID;
+        newAppEntry.migrationId = migrationId;
         newAppEntry.resources.ram = ram;
         newAppEntry.resources.disk = disk;
         newAppEntry.resources.cpu = cpu;
 
-        mecAppMap.insert({key, newAppEntry});
+        mecAppMap.emplace(key, newAppEntry);
 
         currentMEApps++;
 
@@ -195,17 +198,19 @@ MecAppInstanceInfo *VirtualisationInfrastructureManager::instantiateMEApp(Create
 
     //retrieve UE App ID
     int ueAppID = msg->getUeAppID();
+    int migrationId = msg->getMigrationId();
+    MecAppKey key{ueAppID, migrationId};
 
-    //checking if there are ME App slots available and if ueAppIdToMeAppMapKey map entry does not exist (that means ME App not already instantiated)
-    if (currentMEApps < maxMECApps && mecAppMap.find(ueAppID) == mecAppMap.end()) {
+    // Check that a slot is available and this app generation is not already instantiated.
+    if (currentMEApps < maxMECApps && mecAppMap.find(key) == mecAppMap.end()) {
         //getting the first available gate
         int index = freeGates.front();
         freeGates.erase(freeGates.begin());
         EV << "VirtualisationInfrastructureManager::instantiateMEApp - freeGate: " << index << endl;
 
-        //creating ueAppIdToMeAppMapKey map entry
-        EV << "VirtualisationInfrastructureManager::instantiateMEApp - ueAppIdToMeAppMapKey[" << ueAppID << "] = " << index << endl;
-        int key = ueAppID;
+        // The composite key allows a new migration generation to coexist with the old one.
+        EV << "VirtualisationInfrastructureManager::instantiateMEApp - instance key ["
+           << ueAppID << ", " << migrationId << "] uses gate " << index << endl;
 
         double ram = msg->getRequiredRam();
         double disk = msg->getRequiredDisk();
@@ -241,12 +246,13 @@ MecAppInstanceInfo *VirtualisationInfrastructureManager::instantiateMEApp(Create
         //mecAppMap[key].ueAddress = ueAppAddress;
         //mecAppMap[key].uePort = ueAppPort;
         newAppEntry.ueAppID = ueAppID;
+        newAppEntry.migrationId = migrationId;
         newAppEntry.meAppPort = mecAppPortCounter;
         newAppEntry.resources.ram = ram;
         newAppEntry.resources.disk = disk;
         newAppEntry.resources.cpu = cpu;
 
-        mecAppMap.insert({key, newAppEntry});
+        mecAppMap.emplace(key, newAppEntry);
 
         //displaying ME App dynamically created (after 70 they will overlap..)
         std::stringstream display;
@@ -255,6 +261,8 @@ MecAppInstanceInfo *VirtualisationInfrastructureManager::instantiateMEApp(Create
 
         //initialize IMECApp Parameters
         module->par("mecAppId") = ueAppID;
+        module->par("migrationId") = migrationId;
+        module->par("contextId") = msg->getContextId();
         module->par("requiredRam") = ram;
         module->par("requiredDisk") = disk;
         module->par("requiredCpu") = cpu;
@@ -287,7 +295,7 @@ MecAppInstanceInfo *VirtualisationInfrastructureManager::instantiateMEApp(Create
         // connect gates to the meApp
         module->gate("socketOut")->connectTo(newAtInGate);
 
-        mecAppMap[key].meAppGateIndex = newAtInGate->getIndex();
+        mecAppMap.at(key).meAppGateIndex = newAtInGate->getIndex();
 
         /*
          * @author Alessandro Noferi
@@ -339,19 +347,21 @@ MecAppInstanceInfo *VirtualisationInfrastructureManager::instantiateMEApp(Create
 bool VirtualisationInfrastructureManager::terminateEmulatedMEApp(DeleteAppMessage *msg)
 {
     int ueAppID = msg->getUeAppID();
+    MecAppKey key{ueAppID, msg->getMigrationId()};
 
-    if (!mecAppMap.empty() && mecAppMap.find(ueAppID) != mecAppMap.end()) {
-        //retrieve mecAppMap map key
-        int key = ueAppID;
-        EV << "VirtualisationInfrastructureManager::terminateMEApp - " << mecAppMap[key].meAppModule->getName() << " terminated!" << endl;
+    // Find the exact app generation so a delayed stop cannot remove another instance.
+    auto app = mecAppMap.find(key);
+    if (app != mecAppMap.end()) {
+        EV << "VirtualisationInfrastructureManager::terminateEmulatedMEApp - instance ["
+           << ueAppID << ", " << key.second << "] terminated" << endl;
         currentMEApps--;
         EV << "VirtualisationInfrastructureManager::terminateMEApp - currentMEApps: " << currentMEApps << " / " << maxMECApps << endl;
 
         //deallocate resources
-        deallocateResources(mecAppMap[key].resources.ram, mecAppMap[key].resources.disk, mecAppMap[key].resources.cpu);
+        deallocateResources(app->second.resources.ram, app->second.resources.disk, app->second.resources.cpu);
 
         //update map
-        mecAppMap.erase(ueAppID);
+        mecAppMap.erase(app);
 
         return true;
     }
@@ -364,24 +374,26 @@ bool VirtualisationInfrastructureManager::terminateEmulatedMEApp(DeleteAppMessag
 bool VirtualisationInfrastructureManager::terminateMEApp(DeleteAppMessage *msg)
 {
     int ueAppID = msg->getUeAppID();
+    MecAppKey key{ueAppID, msg->getMigrationId()};
 
-    if (!mecAppMap.empty() && mecAppMap.find(ueAppID) != mecAppMap.end()) {
-        //retrieve mecAppMap map key
-        int key = ueAppID;
+    // Find the exact app generation so a delayed stop cannot remove another instance.
+    auto app = mecAppMap.find(key);
+    if (app != mecAppMap.end()) {
 
-        EV << "VirtualisationInfrastructureManager::terminateMEApp - " << mecAppMap[key].meAppModule->getName() << " terminated!" << endl;
+        EV << "VirtualisationInfrastructureManager::terminateMEApp - "
+           << app->second.meAppModule->getName() << " terminated!" << endl;
 
         //terminating the ME App instance
-        mecAppMap[key].meAppModule->callFinish();
-        mecAppMap[key].meAppModule->deleteModule();
+        app->second.meAppModule->callFinish();
+        app->second.meAppModule->deleteModule();
         currentMEApps--;
         EV << "VirtualisationInfrastructureManager::terminateMEApp - currentMEApps: " << currentMEApps << " / " << maxMECApps << endl;
 
         //Sending ACK_STOP_MEAPP to the UEApp
 
         //before removing the map entry!
-        int index = mecAppMap[key].meAppGateIndex;
-        int serviceIndex = mecAppMap[key].serviceIndex;
+        int index = app->second.meAppGateIndex;
+        int serviceIndex = app->second.serviceIndex;
 
         cModule *at = mecHost->getSubmodule("at");
         if (at == nullptr)
@@ -401,10 +413,10 @@ bool VirtualisationInfrastructureManager::terminateMEApp(DeleteAppMessage *msg)
         }
 
         //deallocate resources
-        deallocateResources(mecAppMap[key].resources.ram, mecAppMap[key].resources.disk, mecAppMap[key].resources.cpu);
+        deallocateResources(app->second.resources.ram, app->second.resources.disk, app->second.resources.cpu);
 
         //update map
-        mecAppMap.erase(ueAppID);
+        mecAppMap.erase(app);
 
         freeGates.push_back(index);
 
@@ -416,27 +428,29 @@ bool VirtualisationInfrastructureManager::terminateMEApp(DeleteAppMessage *msg)
     }
 }
 
-bool VirtualisationInfrastructureManager::terminateMecApp(int ueAppId)
+bool VirtualisationInfrastructureManager::terminateMecApp(int ueAppId, int migrationId)
 {
     Enter_Method_Silent("VirtualisationInfrastructureManager::terminateMecApp");
+    MecAppKey key{ueAppId, migrationId};
 
-    if (!mecAppMap.empty() && mecAppMap.find(ueAppId) != mecAppMap.end()) {
-        //retrieve mecAppMap map key
-        int key = ueAppId;
+    // Self-termination must target the generation that owns this MEC app module.
+    auto app = mecAppMap.find(key);
+    if (app != mecAppMap.end()) {
 
-        EV << "VirtualisationInfrastructureManager::terminateMecApp - " << mecAppMap[key].meAppModule->getName() << " terminated!" << endl;
+        EV << "VirtualisationInfrastructureManager::terminateMecApp - "
+           << app->second.meAppModule->getName() << " terminated!" << endl;
 
         //terminating the ME App instance
-        mecAppMap[key].meAppModule->callFinish();
-        mecAppMap[key].meAppModule->deleteModule();
+        app->second.meAppModule->callFinish();
+        app->second.meAppModule->deleteModule();
         currentMEApps--;
         EV << "VirtualisationInfrastructureManager::terminateMecApp - currentMEApps: " << currentMEApps << " / " << maxMECApps << endl;
 
         //Sending ACK_STOP_MEAPP to the UEApp
 
         //before removing the map entry!
-        int index = mecAppMap[key].meAppGateIndex;
-        int serviceIndex = mecAppMap[key].serviceIndex;
+        int index = app->second.meAppGateIndex;
+        int serviceIndex = app->second.serviceIndex;
 
         cModule *at = mecHost->getSubmodule("at");
         if (at == nullptr)
@@ -455,10 +469,10 @@ bool VirtualisationInfrastructureManager::terminateMecApp(int ueAppId)
         }
 
         //deallocate resources
-        deallocateResources(mecAppMap[key].resources.ram, mecAppMap[key].resources.disk, mecAppMap[key].resources.cpu);
+        deallocateResources(app->second.resources.ram, app->second.resources.disk, app->second.resources.cpu);
 
         //update map
-        mecAppMap.erase(ueAppId);
+        mecAppMap.erase(app);
 
         freeGates.push_back(index);
 
@@ -473,13 +487,14 @@ bool VirtualisationInfrastructureManager::terminateMecApp(int ueAppId)
 void VirtualisationInfrastructureManager::triggerServiceUnsubscription(DeleteAppMessage *msg)
 {
     int ueAppID = msg->getUeAppID();
+    MecAppKey key{ueAppID, msg->getMigrationId()};
 
-    if (!mecAppMap.empty() && mecAppMap.find(ueAppID) != mecAppMap.end()) {
-        //retrieve mecAppMap map key
-        int key = ueAppID;
+    // Unsubscribe services for the app generation that is about to be stopped.
+    auto app = mecAppMap.find(key);
+    if (app != mecAppMap.end()) {
 
         EV << "VirtualisationInfrastructureManager::triggerServiceUnsubscription" << endl;
-        MecAppBase *mecAppBase = check_and_cast<MecAppBase *>(mecAppMap[key].meAppModule.get());
+        MecAppBase *mecAppBase = check_and_cast<MecAppBase *>(app->second.meAppModule.get());
         mecAppBase->removeServiceRegistrations();
     }
 }
@@ -505,8 +520,11 @@ bool VirtualisationInfrastructureManager::registerMecApp(int ueAppID, int reqRam
 {
     EV << "VirtualisationInfrastructureManager::registerMecApp - RAM: " << reqRam << " CPU: " << reqCpu << " disk: " << reqDisk << endl;
     printResources();
-    if (mecAppMap.find(ueAppID) == mecAppMap.end()) {
+    // INI-deployed independent apps use the non-migrated generation.
+    MecAppKey key{ueAppID, -1};
+    if (mecAppMap.find(key) != mecAppMap.end()) {
         EV << "VirtualisationInfrastructureManager::handleMEAppResources - independent MEC application with mecAppId [" << ueAppID << "] already instantiated" << endl;
+        return false;
     }
 
     if (isAllocable(reqRam, reqDisk, reqCpu)) {
@@ -514,14 +532,15 @@ bool VirtualisationInfrastructureManager::registerMecApp(int ueAppID, int reqRam
         mecAppEntry appEntry;
 
         appEntry.ueAppID = ueAppID;
+        appEntry.migrationId = -1;
         appEntry.resources.ram = reqRam;
         appEntry.resources.disk = reqDisk;
         double cpu = reqCpu;
         appEntry.resources.cpu = cpu;
-        mecAppMap.insert({ ueAppID, appEntry });
+        auto inserted = mecAppMap.emplace(key, appEntry).first;
 
         EV << "VirtualisationInfrastructureManager::handleMEAppResources - resources ALLOCATED for independent MecApp with module id " << ueAppID << endl;
-        EV << "VirtualisationInfrastructureManager::handleMEAppResources - ram: " << mecAppMap[ueAppID].resources.ram << " disk: " << mecAppMap[ueAppID].resources.disk << " cpu: " << mecAppMap[ueAppID].resources.cpu << endl;
+        EV << "VirtualisationInfrastructureManager::handleMEAppResources - ram: " << inserted->second.resources.ram << " disk: " << inserted->second.resources.disk << " cpu: " << inserted->second.resources.cpu << endl;
         allocateResources(reqRam, reqDisk, reqCpu);
         return true;
     }
@@ -533,12 +552,15 @@ bool VirtualisationInfrastructureManager::registerMecApp(int ueAppID, int reqRam
 
 bool VirtualisationInfrastructureManager::deRegisterMecApp(int ueAppID)
 {
-    if (!mecAppMap.empty() || mecAppMap.find(ueAppID) != mecAppMap.end()) {
+    // INI-deployed independent apps use the non-migrated generation.
+    MecAppKey key{ueAppID, -1};
+    auto app = mecAppMap.find(key);
+    if (app != mecAppMap.end()) {
         EV << "VirtualisationInfrastructureManager::handleMEAppResources - resources DEALLOCATED for MecApp with UEAppId " << ueAppID << endl;
-        EV << "VirtualisationInfrastructureManager::handleMEAppResources - ram: " << mecAppMap[ueAppID].resources.ram << " disk: " << mecAppMap[ueAppID].resources.disk << " cpu: " << mecAppMap[ueAppID].resources.cpu << endl;
-        deallocateResources(mecAppMap[ueAppID].resources.ram, mecAppMap[ueAppID].resources.disk, mecAppMap[ueAppID].resources.cpu);
+        EV << "VirtualisationInfrastructureManager::handleMEAppResources - ram: " << app->second.resources.ram << " disk: " << app->second.resources.disk << " cpu: " << app->second.resources.cpu << endl;
+        deallocateResources(app->second.resources.ram, app->second.resources.disk, app->second.resources.cpu);
         //erasing map entry
-        mecAppMap.erase(ueAppID);
+        mecAppMap.erase(app);
         return true;
     }
     else {
@@ -547,11 +569,13 @@ bool VirtualisationInfrastructureManager::deRegisterMecApp(int ueAppID)
     }
 }
 
-double VirtualisationInfrastructureManager::calculateProcessingTime(int ueAppID, int numOfInstructions)
+double VirtualisationInfrastructureManager::calculateProcessingTime(
+        int ueAppID, int numOfInstructions, int migrationId)
 {
     ASSERT(numOfInstructions >= 0);
 
-    auto ueApp = mecAppMap.find(ueAppID);
+    // Resolve the processing request to the exact app generation.
+    auto ueApp = mecAppMap.find({ueAppID, migrationId});
     if (ueApp != mecAppMap.end()) {
         double time;
         double currentSpeed;
@@ -600,4 +624,3 @@ void VirtualisationInfrastructureManager::reserveResourcesBGApps()
 }
 
 } //namespace
-

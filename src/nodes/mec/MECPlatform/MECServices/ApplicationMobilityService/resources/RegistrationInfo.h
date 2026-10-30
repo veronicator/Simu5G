@@ -38,6 +38,7 @@ class RegistrationInfo : public AttributeBase{
     std::string appMobilityServiceId;
     std::vector<DeviceInformation> deviceInformation;
     int expiryTime; // not mandatory
+    int contextId = -1;
     ServiceConsumerId serviceConsumerId;
     // extended fields for HMS supporting - NOT in ETSI specifications
     bool mobileMecHost;
@@ -58,11 +59,13 @@ class RegistrationInfo : public AttributeBase{
 
     // set methods
     void setAppMobilityServiceId(std::string appMobSId);
+    void setContextId(int id) { contextId = id; }
 
     // get methods
     std::string getAppMobilityServiceId() const {return appMobilityServiceId;}
     std::vector<DeviceInformation> getDeviceInformation() const {return deviceInformation;}
     int getExpiryTime() const {return expiryTime;}
+    int getContextId() const {return contextId;}
     ServiceConsumerId getServiceConsumerId() const {return serviceConsumerId;}
 
     bool isMobileMecHost() const { return mobileMecHost; }

@@ -48,6 +48,7 @@ void MecAppBase::initialize(int stage)
     mp1Port = par("mp1Port");
 
     mecAppId = par("mecAppId"); // FIXME mecAppId is the deviceAppId (it does not change anything, though)
+    migrationId = par("migrationId");
     requiredRam = par("requiredRam").doubleValue();
     requiredDisk = par("requiredDisk").doubleValue();
     requiredCpu = par("requiredCpu").doubleValue();
@@ -150,7 +151,7 @@ void MecAppBase::handleMessage(cMessage *msg)
                 delete msgStatus->httpMessageQueue.pop();
                 if (!msgStatus->httpMessageQueue.isEmpty()) {
                     EV << "MecAppBase::handleMessage(): processedHttpMsg - the httpMessageQueue is not empty, schedule next HTTP message" << endl;
-                    double time = vim->calculateProcessingTime(mecAppId, 150);
+                    double time = vim->calculateProcessingTime(mecAppId, 150, migrationId);
                     scheduleAt(simTime() + time, msg);
                 }
             }
@@ -394,7 +395,7 @@ void MecAppBase::handleAmsMessage(int connId) {
 //                std::cout << "MecAppBase::handleAmsMessage - Received response 204" << endl;
                 // response of deleteRequest - service deregistration
                 if (mobilityAware_ && !amsRegistration_)
-                    vim->terminateMecApp(mecAppId);
+                    vim->terminateMecApp(mecAppId, migrationId);
             }
             else if (amsResponse->getCode() == 404) {
                 // this should not happen
@@ -428,6 +429,7 @@ void MecAppBase::sendAmsRegistration(cMessage *msg)
     registrationBody = nlohmann::ordered_json();
     registrationBody["serviceConsumerId"]["appInstanceId"] = std::string(getName());
     registrationBody["serviceConsumerId"]["mepId"] = "";
+    registrationBody["contextId"] = par("contextId").intValue();
     registrationBody["deviceInformation"] = nlohmann::json::array();
 
 //    if(!ueAppAddress_.isUnspecified() && ueAppPort_ > 0){
@@ -488,7 +490,7 @@ void MecAppBase::established(int connId) {
 
 double MecAppBase::scheduleNextMsg(cMessage *msg)
 {
-    double processingTime = vim->calculateProcessingTime(mecAppId, 20);
+    double processingTime = vim->calculateProcessingTime(mecAppId, 20, migrationId);
     return processingTime;
 }
 
@@ -530,7 +532,7 @@ void MecAppBase::socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, b
     if (res) {
         if (vim == nullptr)
             throw cRuntimeError("MecAppBase::socketDataArrived - vim is null!");
-        double time = vim->calculateProcessingTime(mecAppId, 150);
+        double time = vim->calculateProcessingTime(mecAppId, 150, migrationId);
         if (!msgStatus->processMsgTimer->isScheduled())
             scheduleAt(simTime() + time, msgStatus->processMsgTimer);
     }
@@ -604,4 +606,3 @@ void MecAppBase::removeServiceRegistrations() {
 }
 
 } //namespace
-

@@ -179,7 +179,7 @@ void MECResponseApp::handleServiceMessage(int connId)
 
 void MECResponseApp::doComputation()
 {
-    processingTime_ = vim->calculateProcessingTime(mecAppId, uniform(minInstructions_, maxInstructions_));
+    processingTime_ = vim->calculateProcessingTime(mecAppId, uniform(minInstructions_, maxInstructions_), migrationId);
     EV << "time " << processingTime_ << endl;
     scheduleAt(simTime() + processingTime_, processingTimer_);
 }
@@ -245,4 +245,3 @@ void MECResponseApp::sendStopAck()
 }
 
 } //namespace
-

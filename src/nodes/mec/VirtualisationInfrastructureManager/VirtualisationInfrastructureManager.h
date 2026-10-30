@@ -15,6 +15,7 @@
 #include <inet/networklayer/common/InterfaceTable.h>
 #include <inet/networklayer/common/L3Address.h>
 #include <inet/networklayer/common/L3AddressResolver.h>
+#include <utility>
 
 #include "common/LteCommon.h"
 #include "common/binder/Binder.h"
@@ -32,8 +33,9 @@ using namespace omnetpp;
 
 struct mecAppEntry
 {
-    int meAppGateIndex;         // map key
+    int meAppGateIndex;         // MEC app gate index
     int serviceIndex;           // OMNeT service index
+    int migrationId = -1;
     opp_component_ptr<cModule> meAppModule;       // for MEC app termination
     inet::L3Address ueAddress;  // for downstream using UDP Socket
     int uePort;
@@ -68,6 +70,8 @@ class DeleteAppMessage;
 
 class VirtualisationInfrastructureManager : public cSimpleModule
 {
+    using MecAppKey = std::pair<int, int>;
+
     friend class MecOrchestrator; // Friend Class
 
     //------------------------------------
@@ -107,9 +111,8 @@ class VirtualisationInfrastructureManager : public cSimpleModule
     std::vector<int> freeGates;
     // ------------------------------------
 
-    // storing the UEApp and MECApp informations
-    // key = MEC App gate index - value mecAppMapEntry
-    std::map<int, mecAppEntry> mecAppMap;
+    // The pair is (UE app ID, migration ID); migration ID -1 identifies the initial instance.
+    std::map<MecAppKey, mecAppEntry> mecAppMap;
 
     //------------------------------------
     // Resources manager
@@ -134,7 +137,7 @@ class VirtualisationInfrastructureManager : public cSimpleModule
     bool terminateMEApp(DeleteAppMessage *msg);
     bool terminateEmulatedMEApp(DeleteAppMessage *msg);
     // called by MecAppBase
-    bool terminateMecApp(int ueAppId);
+    bool terminateMecApp(int ueAppId, int migrationId = -1);
 
     /**
      * method to trigger service unsubscription and/or deregistration of a mec app that is going to be terminated
@@ -160,7 +163,7 @@ class VirtualisationInfrastructureManager : public cSimpleModule
      * @return calculated time to execute numOfInstructions as double
      *
      */
-    virtual double calculateProcessingTime(int mecAppID, int numOfInstructions);
+    virtual double calculateProcessingTime(int mecAppID, int numOfInstructions, int migrationId = -1);
 
     /*
      * Methods called by MEC apps deployed through INI and not by UEs. Such MEC apps
@@ -238,4 +241,3 @@ class VirtualisationInfrastructureManager : public cSimpleModule
 } //namespace
 
 #endif
-

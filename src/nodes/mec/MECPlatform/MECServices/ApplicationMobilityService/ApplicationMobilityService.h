@@ -65,7 +65,7 @@ class ApplicationMobilityService : public MecServiceBase2
   std::map<std::string, SubscriptionLinkList> subscriptionLinkList; // Not used so far..
 
   double waitingTimeTriggerMigration_;
-  std::map<std::string, std::vector<std::string>> pendingAppInstanceIdsByHost_;
+  std::map<std::string, std::vector<int>> pendingContextIdsByHost_;
 
   int migrationCounter_;
   simsignal_t totalMigrationsSignal_;

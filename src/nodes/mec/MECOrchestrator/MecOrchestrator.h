@@ -33,9 +33,17 @@ namespace simu5g {
 
 using namespace omnetpp;
 
+enum class MecAppLifecycle {
+    ACTIVE,
+    MIGRATION_TARGET,
+    SOURCE_PENDING_DELETE
+};
+
 struct mecAppMapEntry
 {
     int contextId;
+    int migrationId = -1;
+    MecAppLifecycle lifecycle = MecAppLifecycle::ACTIVE;
     std::string appDId;
     std::string mecAppName;
     std::string mecAppInstanceId;
@@ -103,8 +111,11 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     //storing the UEApp and MEApp information
     //key = contextId - value mecAppMapEntry
     std::map<int, mecAppMapEntry> meAppMap;
-    //temporary MECAppMap used during migration process
+    // At most one migration target per contextId while the target is being instantiated.
     std::map<int, mecAppMapEntry> tmpMeAppMap;
+    // Old instances remain here until their delayed stop request is sent.
+    std::map<int, mecAppMapEntry> pendingDeleteMeApps;
+    int nextMigrationId_ = 1;
     std::map<std::string, ApplicationDescriptor> mecApplicationDescriptors_;
 
     // next context id to be assigned to new MEC apps
@@ -152,7 +163,7 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
      * handling STOP_MIGRATED_INSTANCE_APP type
      * send a message to the MEPM of the source MecHost to stop the instance of the migrated MecApp
      */
-    void stopMigratedMecApp(bool result, int ueAppId, int contextId);
+    void stopMigratedMecApp(bool result, int ueAppId, int migrationId);
 
     void migrateAllMecApps(cMessage *msg);
     /**
@@ -161,12 +172,13 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     void migrateMecApps(cMessage *msg);
     void migrateMecApp(cMessage *msg);
     void handleMigrateAppAck(cMessage *msg);
+    void deferMigrationRequest(cMessage *msg);
 
     // sending ACK_CREATE_CONTEXT_APP or ACK_DELETE_CONTEXT_APP
     void sendCreateAppContextAck(bool result, unsigned int requestSno, int contextId = -1);
     void sendDeleteAppContextAck(bool result, unsigned int requestSno, int contextId = -1);
     // send migrateAppContextMsg to UALCMP and schedule timer for trigger stop old MecApp instance
-    void sendMigrateAppContext(bool result, int ueAppId, int contextId);
+    void sendMigrateAppContext(bool result, int ueAppId, int contextId, int migrationId);
 
     /*
      * This method selects the most suitable MEC host where to deploy the MEC app.

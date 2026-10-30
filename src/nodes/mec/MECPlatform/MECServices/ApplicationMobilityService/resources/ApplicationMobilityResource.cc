@@ -1,6 +1,7 @@
 
 
 #include "ApplicationMobilityResource.h"
+#include <algorithm>
 
 namespace simu5g {
 
@@ -72,6 +73,8 @@ bool ApplicationMobilityResource::updateRegistrationInfo(std::string appMobility
         return false;
     }
     r->setAppMobilityServiceId(appMobilityServiceId);
+    if (r->getContextId() < 0)
+        r->setContextId(it->second->getContextId());
     // If app has been migrated change its state
     // remeber correspondence 1 to 1 (1 mecapp 1 ue)
     if(r->getDeviceInformation()[0].getContextTransferState() == USER_CONTEXT_TRANSFER_COMPLETED)
@@ -278,6 +281,17 @@ std::vector<std::string> ApplicationMobilityResource::getAppInstanceIdsFromMecHo
     return appInstanceIds;
 }
 
+std::vector<int> ApplicationMobilityResource::getContextIdsFromMecHostAddress(
+        const std::string& mecHostAddr) const
+{
+    std::vector<int> contextIds;
+    for (const auto& consumer : serviceConsumers_) {
+        const int contextId = consumer.second->getContextId();
+        if (mecHostAddr == consumer.second->getMecHostAddress() && contextId >= 0 &&
+                std::find(contextIds.begin(), contextIds.end(), contextId) == contextIds.end())
+            contextIds.push_back(contextId);
+    }
+    return contextIds;
+}
 
 }   // namespace
-

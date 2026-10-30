@@ -19,9 +19,11 @@ cplusplus {{
 #include <vector>
 
 typedef std::vector<std::string> AppInstanceIdVector;
+typedef std::vector<int> ContextIdVector;
 }}
 
 class AppInstanceIdVector { @existingClass; }
+class ContextIdVector { @existingClass; }
 
 namespace simu5g;
 
@@ -40,6 +42,7 @@ struct SockAddr {
 message MECOrchestratorMessage {
     int contextId; // identifier of the ueMecApp 
     int requestId; // used to inform the UALCMP to which request the response refers or to which UeId in case of migration
+    int migrationId; // identifies one migration independently of the app context
     string type; // trigger of mecApp setup or termination 	 
     bool success;   
 }
@@ -69,6 +72,7 @@ class CreateAppMessage extends MECMessage {
     string MEModuleType;			//path where to find the cModule of the MEApp to instantiate
     string MEModuleName;			//module class name of the MEApp to instantiate
     int contextId;
+    int migrationId; // identifies the migration request; unused for regular app creation
     
     //identification information
     int ueAppID;
@@ -104,6 +108,7 @@ class DeleteAppMessage extends MECMessage {
     
     //identification information
     int ueAppID;
+    int migrationId = -1;
     
     //resources required
     unsigned int requiredDisk;
@@ -131,6 +136,7 @@ class MigrateAppAckMessage extends MECMessage {
    	string mepmAddress;
    	
     int contextId;
+    int migrationId;
    
     unsigned int sno;
     
@@ -148,10 +154,10 @@ class TriggerMigrationAppMessage extends MECMessage {
    	
    	AssociateId associateId;	// type, value
    	AppInstanceIdVector appInstanceIds;	//mec app instance to migrate
+    ContextIdVector contextIds;	// stable MEC application context identifiers
    	
    	MacNodeId srcCellId;
    	MacNodeId trgCellId;
    	
    	
 }
-

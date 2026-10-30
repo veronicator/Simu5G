@@ -200,22 +200,22 @@ void UALCMPApp::handleMigrateAppMessage(UALCMPMessage *msg) {
         return;
     }
     int sockId = ueSockets_[ueAppId];
-        inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(socketMap.getSocketById(sockId));
+    inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(socketMap.getSocketById(sockId));
 
-        if (socket) {
-            jsonBody["startMigrationTime"] = migrate->getStartMigrationTime().str();
-            jsonBody["stopMigrationTime"] = migrate->getStopMigrationTime().str();
-            jsonBody["notificationType"] = ADDRESS_CHANGE_NOTIFICATION;
-            jsonBody["contextId"] = std::to_string(migrate->getContextId());
-            jsonBody["appInstanceId"] = migrate->getAppInstanceId();
-            jsonBody["referenceURI"] = migrate->getAppInstanceUri(); // add the end point
-            std::stringstream uri;
-            uri << baseUriQueries_ << "/notifications/" << ADDRESS_CHANGE_NOTIFICATION;
-            std::pair<std::string, std::string> locHeader("Location: ", uri.str());
+    if (socket) {
+        jsonBody["startMigrationTime"] = migrate->getStartMigrationTime().str();
+        jsonBody["stopMigrationTime"] = migrate->getStopMigrationTime().str();
+        jsonBody["notificationType"] = ADDRESS_CHANGE_NOTIFICATION;
+        jsonBody["contextId"] = std::to_string(migrate->getContextId());
+        jsonBody["appInstanceId"] = migrate->getAppInstanceId();
+        jsonBody["referenceURI"] = migrate->getAppInstanceUri(); // add the end point
+        std::stringstream uri;
+        uri << baseUriQueries_ << "/notifications/" << ADDRESS_CHANGE_NOTIFICATION;
+        std::pair<std::string, std::string> locHeader("Location: ", uri.str());
 
-            std::string host = socket->getRemoteAddress().str() + ":" + std::to_string(socket->getRemotePort());
-            Http::sendPostRequest(socket, jsonBody.dump().c_str(), host.c_str(), uri.str().c_str());
-        }
+        std::string host = socket->getRemoteAddress().str() + ":" + std::to_string(socket->getRemotePort());
+        Http::sendPostRequest(socket, jsonBody.dump().c_str(), host.c_str(), uri.str().c_str());
+    }
 }
 
 

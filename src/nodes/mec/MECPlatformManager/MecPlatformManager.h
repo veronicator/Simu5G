@@ -115,12 +115,12 @@ class MecPlatformManager : public cSimpleModule, public inet::TcpSocket::ICallba
     void instantiateMigratingMecApp(cMessage *msg);
     // method to trigger the migration of a MEC app after UE handover
     // - id Ue performing handover - target mecHost/gNB
-    void triggerMecAppMigration(AssociateId associateId, std::vector<std::string> appInstanceIds, MacNodeId srcEcgi, MacNodeId trgEcgi);
+    void triggerMecAppMigration(simtime_t startMigration, AssociateId associateId, std::vector<int> contextIds, MacNodeId srcEcgi, MacNodeId trgEcgi);
     /*
      * method to trigger the migration of a MEC app instances after MEC host handover
      * @trgCellId: source cell id of mec host before cell change
      */
-    void triggerMecAppsMigration(simtime_t startMigration, std::vector<std::string> appInstanceIds, MacNodeId trgCellId);
+    void triggerMecAppsMigration(simtime_t startMigration, std::vector<int> contextIds, MacNodeId trgCellId);
 
     /* stop and remove MecApp instance from the MecHost after migration
      * triggered by a message from MEO*/

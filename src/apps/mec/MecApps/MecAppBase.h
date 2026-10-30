@@ -138,6 +138,7 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
     inet::ModuleRefByPar<ServiceRegistry> serviceRegistry;
 
     int mecAppId;
+    int migrationId = -1;
     double requiredRam;
     double requiredDisk;
     double requiredCpu;
@@ -198,4 +199,3 @@ class MecAppBase : public cSimpleModule, public inet::TcpSocket::ICallback
 } //namespace
 
 #endif /* APPS_MEC_MEAPPS_MECAPPBASE_H_ */
-

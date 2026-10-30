@@ -159,7 +159,7 @@ bool MecPlatformManager::terminateMEApp(DeleteAppMessage *msg)
     return res;
 }
 
-void MecPlatformManager::triggerMecAppMigration(AssociateId associateId, std::vector<std::string> appInstanceIds, MacNodeId srcEcgi, MacNodeId trgEcgi) {
+void MecPlatformManager::triggerMecAppMigration(simtime_t startMigration, AssociateId associateId, std::vector<int> contextIds, MacNodeId srcEcgi, MacNodeId trgEcgi) {
 
     Enter_Method_Silent("MecPlatformManager::triggerMecAppMigration");
 
@@ -168,19 +168,20 @@ void MecPlatformManager::triggerMecAppMigration(AssociateId associateId, std::ve
     inet::Packet *newPkt = new inet::Packet("TriggerMigrateAppMessage");
     auto migrateMsg = inet::makeShared<TriggerMigrationAppMessage>();
     migrateMsg->setType(MIGRATE_MEAPP);
+    migrateMsg->setTimestamp(startMigration);
     migrateMsg->setAssociateId(associateId);
-    migrateMsg->setAppInstanceIds(appInstanceIds);
+    migrateMsg->setContextIds(contextIds);
     migrateMsg->setSrcCellId(srcEcgi);
     migrateMsg->setTrgCellId(trgEcgi);
     inet::B msgSize = inet::B(40 + strlen(migrateMsg->getType()) + strlen(associateId.getType().c_str()) + strlen(associateId.getValue().c_str())
-            + sizeof(appInstanceIds));
+            + contextIds.size() * sizeof(int));
     migrateMsg->setChunkLength(msgSize);
 
     newPkt->insertAtBack(migrateMsg);
     meoSocket_.send(newPkt);
 }
 
-void MecPlatformManager::triggerMecAppsMigration(simtime_t startMigration, std::vector<std::string> appInstanceIds, MacNodeId trgEcgi) {
+void MecPlatformManager::triggerMecAppsMigration(simtime_t startMigration, std::vector<int> contextIds, MacNodeId trgEcgi) {
 
     Enter_Method_Silent("MecPlatformManager::triggerMecAppsMigration");
 
@@ -190,16 +191,14 @@ void MecPlatformManager::triggerMecAppsMigration(simtime_t startMigration, std::
     auto migrateMsg = inet::makeShared<TriggerMigrationAppMessage>();
     migrateMsg->setType(MIGRATE_MEAPPS);
     migrateMsg->setTimestamp(startMigration);
-    migrateMsg->setAppInstanceIds(appInstanceIds);
+    migrateMsg->setContextIds(contextIds);
     migrateMsg->setTrgCellId(trgEcgi);
-    int vecSize = 0;
-    for (auto instanceId: appInstanceIds)
-        vecSize += strlen(instanceId.c_str());
+    const int vecSize = contextIds.size() * sizeof(int);
 
-    inet::B msgSize = inet::B(48 + strlen(migrateMsg->getType()) + vecSize);    // sizeof(appInstanceIds)
+    inet::B msgSize = inet::B(48 + strlen(migrateMsg->getType()) + vecSize);
     migrateMsg->setChunkLength(msgSize);
 
-    std::cout << "\nmepm::triggerMecAppsMigration -> appInstanceIds size: " << vecSize << endl;
+    std::cout << "\nmepm::triggerMecAppsMigration -> contextIds size: " << contextIds.size() << endl;
 
     newPkt->insertAtBack(migrateMsg);
     auto pktSize = newPkt->getByteLength();
@@ -239,32 +238,36 @@ void MecPlatformManager::instantiateMigratingMecApp(cMessage *msg)
     inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
     auto meoMsg = pkt->removeAtFront<CreateAppMessage>();
     int contextId = meoMsg->getContextId();
+    int migrationId = meoMsg->getMigrationId();
 
     MecAppInstanceInfo *res = vim->instantiateMEApp(meoMsg.get());
 
+    auto migrateAckMsg = inet::makeShared<MigrateAppAckMessage>();
+    migrateAckMsg->setType(ACK_MIGRATE_MEAPP);
+    migrateAckMsg->setContextId(contextId);
+    migrateAckMsg->setMigrationId(migrationId);
+    migrateAckMsg->setStatus(res->status);
     if (res->status) {
-        auto migrateAckMsg = inet::makeShared<MigrateAppAckMessage>();
-        migrateAckMsg->setType(ACK_MIGRATE_MEAPP);
-        migrateAckMsg->setContextId(contextId);
-        migrateAckMsg->setStatus(res->status);
         migrateAckMsg->setInstanceId(res->instanceId.c_str());
         migrateAckMsg->setModuleId(res->reference->getId());
         migrateAckMsg->setEndPoint(res->endPoint);
-
-        migrateAckMsg->setMepmId(getId());
-        migrateAckMsg->setMepmAddress(mepmAddress_.str().c_str());
-
-        inet::B msgSize = inet::B(50 + strlen(migrateAckMsg->getType()) + strlen(migrateAckMsg->getMepmAddress())
-                + strlen(migrateAckMsg->getInstanceId()) + strlen(migrateAckMsg->getEndPoint().addr.str().c_str()));
-
-        migrateAckMsg->setChunkLength(msgSize);
-        inet::Packet *newPkt = new inet::Packet("MigrateAppAckMessage");
-        newPkt->insertAtBack(migrateAckMsg);
-        meoSocket_.send(newPkt);
     }
-    else {
-        // todo: handle error case
+
+    migrateAckMsg->setMepmId(getId());
+    migrateAckMsg->setMepmAddress(mepmAddress_.str().c_str());
+
+    inet::B msgSize = inet::B(50 + sizeof(migrationId) + strlen(migrateAckMsg->getType())
+            + strlen(migrateAckMsg->getMepmAddress()));
+    if (res->status) {
+        msgSize += inet::B(strlen(migrateAckMsg->getInstanceId())
+                + strlen(migrateAckMsg->getEndPoint().addr.str().c_str()));
     }
+
+    migrateAckMsg->setChunkLength(msgSize);
+    inet::Packet *newPkt = new inet::Packet("MigrateAppAckMessage");
+    newPkt->insertAtBack(migrateAckMsg);
+    meoSocket_.send(newPkt);
+    delete res;
     delete msg;
 }
 

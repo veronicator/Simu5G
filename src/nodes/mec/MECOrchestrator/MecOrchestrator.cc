@@ -32,6 +32,7 @@
 #include "nodes/mec/MECOrchestrator/mecHostSelectionPolicies/MigrationMecServiceSelectionBased.h"
 
 // Emulation debug
+#include <algorithm>
 #include <iostream>
 
 namespace simu5g {
@@ -95,7 +96,20 @@ void MecOrchestrator::initialize(int stage)
 void MecOrchestrator::handleMessage(cMessage *msg)
 {
     if (msg->isSelfMessage()) {
-        if (strcmp(msg->getName(), "MECOrchestratorMessage") == 0) {
+        if (strcmp(msg->getName(), "DeferredMigrationRequest") == 0) {
+            inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
+            auto mepmMsg = pkt->peekAtFront<MECMessage>();
+            if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPP))
+                migrateMecApp(pkt);
+            else if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPPS))
+                migrateMecApps(pkt);
+            else if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPPS_REQ))
+                migrateAllMecApps(pkt);
+            else
+                throw cRuntimeError("MecOrchestrator::handleMessage - unexpected deferred migration type '%s'",
+                        mepmMsg->getType());
+        }
+        else if (strcmp(msg->getName(), "MECOrchestratorMessage") == 0) {
             EV << "MecOrchestrator::handleMessage - " << msg->getName() << endl;
             MECOrchestratorMessage *meoMsg = check_and_cast<MECOrchestratorMessage *>(msg);
             if (strcmp(meoMsg->getType(), CREATE_CONTEXT_APP) == 0) {
@@ -109,10 +123,12 @@ void MecOrchestrator::handleMessage(cMessage *msg)
                 sendDeleteAppContextAck(meoMsg->getSuccess(), meoMsg->getRequestId(), meoMsg->getContextId());
 
             else if (strcmp(meoMsg->getType(), MIGRATE_CONTEXT_APP) == 0)
-                sendMigrateAppContext(meoMsg->getSuccess(), meoMsg->getRequestId(), meoMsg->getContextId());
+                sendMigrateAppContext(meoMsg->getSuccess(), meoMsg->getRequestId(),
+                        meoMsg->getContextId(), meoMsg->getMigrationId());
 
             else if (strcmp(meoMsg->getType(), STOP_MIGRATED_INSTANCE_APP) == 0) {
-                stopMigratedMecApp(meoMsg->getSuccess(), meoMsg->getRequestId(), meoMsg->getContextId());
+                stopMigratedMecApp(meoMsg->getSuccess(), meoMsg->getRequestId(),
+                        meoMsg->getMigrationId());
             }
         }
     }
@@ -133,6 +149,16 @@ void MecOrchestrator::handleMessage(cMessage *msg)
             delete msg;
         }
     }
+}
+
+void MecOrchestrator::deferMigrationRequest(cMessage *msg)
+{
+    if (strcmp(msg->getName(), "DeferredMigrationRequest") != 0) {
+        EV << "MecOrchestrator::deferMigrationRequest - delaying migration request until the in-flight migration completes"
+           << endl;
+        msg->setName("DeferredMigrationRequest");
+    }
+    scheduleAt(simTime() + 0.01, msg);
 }
 
 void MecOrchestrator::socketAvailable(inet::TcpSocket *socket, inet::TcpAvailableInfo *availableInfo)
@@ -219,7 +245,9 @@ void MecOrchestrator::startMECApp(UALCMPMessage *msg)
 
     for (const auto& contextApp : meAppMap)
     {
-        if (contextApp.second.mecUeAppID == ueAppID && contextApp.second.appDId.compare(contAppMsg->getAppDId()) == 0)
+        if (contextApp.second.lifecycle == MecAppLifecycle::ACTIVE &&
+                contextApp.second.mecUeAppID == ueAppID &&
+                contextApp.second.appDId.compare(contAppMsg->getAppDId()) == 0)
         {
             EV << "MecOrchestrator::startMECApp - \tWARNING: required MEC App instance ALREADY STARTED on MEC host: " << contextApp.second.mecHost->getName() << endl;
             EV << "MecOrchestrator::startMECApp  - sending ackMEAppPacket with " << ACK_CREATE_CONTEXT_APP << endl;
@@ -264,6 +292,7 @@ void MecOrchestrator::startMECApp(UALCMPMessage *msg)
 
     if (bestHost != nullptr) {
         CreateAppMessage *createAppMsg = new CreateAppMessage();
+        createAppMsg->setMigrationId(-1);
 
         createAppMsg->setUeAppID(atoi(contAppMsg->getDevAppId()));
         createAppMsg->setMEModuleName(desc.getAppName().c_str());
@@ -383,9 +412,23 @@ void MecOrchestrator::stopMECApp(UALCMPMessage *msg) {
     int contextId = contAppMsg->getContextId();
     EV << "MecOrchestrator::stopMECApp - processing contextId: " << contextId << endl;
     // Checking if ueAppIdToMeAppMapKey entry map does exist
-    if (meAppMap.empty() || (meAppMap.find(contextId) == meAppMap.end())) {
+    auto activeAppIt = meAppMap.find(contextId);
+    if (activeAppIt == meAppMap.end()) {
         // Maybe it has already been deleted
-        EV << "MecOrchestrator::stopMECApp - \tWARNING MEC Application [" << meAppMap[contextId].mecUeAppID << "] not found!" << endl;
+        EV << "MecOrchestrator::stopMECApp - \tWARNING MEC Application context ["
+           << contextId << "] not found!" << endl;
+        sendDeleteAppContextAck(false, contAppMsg->getRequestId(), contextId);
+        return;
+    }
+    if (activeAppIt->second.lifecycle != MecAppLifecycle::ACTIVE) {
+        EV_ERROR << "MecOrchestrator::stopMECApp - context " << contextId
+                 << " does not refer to an active MEC app" << endl;
+        sendDeleteAppContextAck(false, contAppMsg->getRequestId(), contextId);
+        return;
+    }
+    if (tmpMeAppMap.find(contextId) != tmpMeAppMap.end()) {
+        EV_WARN << "MecOrchestrator::stopMECApp - migration is in progress for context "
+                << contextId << "; retry deletion after migration completes" << endl;
         sendDeleteAppContextAck(false, contAppMsg->getRequestId(), contextId);
         return;
     }
@@ -395,6 +438,7 @@ void MecOrchestrator::stopMECApp(UALCMPMessage *msg) {
     MecPlatformManager *mecpm = check_and_cast<MecPlatformManager *>(meAppMap[contextId].mecpm);
     DeleteAppMessage *deleteAppMsg = new DeleteAppMessage();
     deleteAppMsg->setUeAppID(meAppMap[contextId].mecUeAppID);
+    deleteAppMsg->setMigrationId(meAppMap[contextId].migrationId);
 
     bool isTerminated;
     if (meAppMap[contextId].isEmulated) {
@@ -424,29 +468,36 @@ void MecOrchestrator::stopMECApp(UALCMPMessage *msg) {
 }
 
 
-void MecOrchestrator::stopMigratedMecApp(bool result, int ueAppId, int contextId) {
-
-    EV << "MecOrchestrator::stopMigratedMecApp - processing contextId: " << contextId << endl;
+void MecOrchestrator::stopMigratedMecApp(bool result, int ueAppId, int migrationId) {
 
     if (!result) {
         EV << "MecOrchestrator::stopMigratedMecApp - not success - this should not happen" << endl;
         return;
     }
 
-    // Checking if ueAppIdToMeAppMapKey entry map does exist
-    if (meAppMap.empty() || (meAppMap.find(contextId) == meAppMap.end())) {
-        // Maybe it has already been deleted
-        EV << "MecOrchestrator::stopMigratedMecApp - \t MEC Application [" << contextId << "] not found!" << endl;
+    auto oldAppIt = pendingDeleteMeApps.find(migrationId);
+    if (oldAppIt == pendingDeleteMeApps.end()) {
+        EV << "MecOrchestrator::stopMigratedMecApp - no pending source instance for migrationId="
+           << migrationId << endl;
         return;
+    }
+    const mecAppMapEntry oldMecApp = oldAppIt->second;
+    EV << "MecOrchestrator::stopMigratedMecApp - stopping source instance for contextId="
+       << oldMecApp.contextId << " migrationId=" << migrationId << " on MEC host "
+       << (oldMecApp.mecHost != nullptr ? oldMecApp.mecHost->getFullPath() : "<null>")
+       << " ueAppId=" << ueAppId << endl;
+    if (oldMecApp.lifecycle != MecAppLifecycle::SOURCE_PENDING_DELETE) {
+        throw cRuntimeError("MecOrchestrator::stopMigratedMecApp - migrationId %d is not pending deletion", migrationId);
     }
 
     // Send a message to MEPM of the selected (source) MEC host to deallocate the resources (source-mepm)
 
     auto deleteAppMsg = inet::makeShared<DeleteAppMessage>();
     deleteAppMsg->setType(STOP_MIGRATED_MEAPP);
-    deleteAppMsg->setUeAppID(ueAppId);
+    deleteAppMsg->setUeAppID(oldMecApp.mecUeAppID);
+    deleteAppMsg->setMigrationId(oldMecApp.migrationId);
 
-    inet::B msgSize = inet::B(80 + strlen(deleteAppMsg->getType()) + strlen(deleteAppMsg->getSourceAddress())
+    inet::B msgSize = inet::B(84 + strlen(deleteAppMsg->getType()) + strlen(deleteAppMsg->getSourceAddress())
             + strlen(deleteAppMsg->getDestinationAddress()) + strlen(deleteAppMsg->getDestinationMecAppAddress()) + strlen(deleteAppMsg->getMEModuleType())
             + strlen(deleteAppMsg->getMEModuleName()) + strlen(deleteAppMsg->getRequiredService()));
     deleteAppMsg->setChunkLength(msgSize);
@@ -455,17 +506,13 @@ void MecOrchestrator::stopMigratedMecApp(bool result, int ueAppId, int contextId
     inet::Packet *newPkt = new inet::Packet("DeleteAppMessage");
     newPkt->insertAtBack(deleteAppMsg);
 
-    MecPlatformManager *oldMecpm = check_and_cast<MecPlatformManager *>(meAppMap[contextId].mecpm);
+    MecPlatformManager *oldMecpm = check_and_cast<MecPlatformManager *>(oldMecApp.mecpm);
     inet::L3Address mepmAddress = oldMecpm->getMepmAddress();
     int sockId = mepmSockets_[mepmAddress];
-    inet::TcpSocket *socket = check_and_cast_nullable<inet::TcpSocket *>(sockets_.getSocketById(sockId));
+    inet::TcpSocket *socket = check_and_cast<inet::TcpSocket *>(sockets_.getSocketById(sockId));
 
     socket->send(newPkt);
-
-    meAppMap[contextId] = tmpMeAppMap[contextId];
-
-    tmpMeAppMap.erase(tmpMeAppMap.find(contextId));
-
+    pendingDeleteMeApps.erase(oldAppIt);
 }
 
 void MecOrchestrator::migrateMecApp(cMessage *msg) {
@@ -478,22 +525,93 @@ void MecOrchestrator::migrateMecApp(cMessage *msg) {
     // note: only "UE_IPv4_ADDRESS" type is supported for now
     inet::L3Address ueAddress = inet::L3Address(associateId.getValue().c_str());
     std::vector<std::string> appInstanceIds = mepmMsg->getAppInstanceIds();
-//    MacNodeId srcCellId = mepmMsg->getSrcCellId();
+    const auto contextIds = mepmMsg->getContextIds();
+    if (!contextIds.empty()) {
+        appInstanceIds.clear();
+        for (int contextId : contextIds) {
+            auto activeIt = meAppMap.find(contextId);
+            if (activeIt != meAppMap.end() &&
+                    activeIt->second.lifecycle == MecAppLifecycle::ACTIVE)
+                appInstanceIds.push_back(activeIt->second.mecAppInstanceId);
+        }
+    }
+    MacNodeId srcCellId = mepmMsg->getSrcCellId();
     MacNodeId trgCellId = mepmMsg->getTrgCellId();
+
+    EV << "MecOrchestrator::migrateMecApp - UE handover: associateId="
+       << associateId.getType() << ":" << associateId.getValue()
+       << " srcCellId=" << srcCellId << " trgCellId=" << trgCellId
+       << " contextIds=" << contextIds.size()
+       << " resolvedActiveInstances=" << appInstanceIds.size() << endl;
+    for (const auto& appInstanceId : appInstanceIds)
+        EV << "MecOrchestrator::migrateMecApp - requested appInstanceId="
+           << appInstanceId << endl;
+
+    auto targetHostsIt = cellToMecHosts.find(trgCellId);
+    if (targetHostsIt == cellToMecHosts.end()) {
+        EV << "MecOrchestrator::migrateMecApp - no MEC hosts are mapped to target cell "
+           << trgCellId << endl;
+    }
+    else {
+        for (auto mecHost : targetHostsIt->second)
+            EV << "MecOrchestrator::migrateMecApp - target cell " << trgCellId
+               << " is served by MEC host "
+               << (mecHost != nullptr ? mecHost->getFullPath() : "<null>") << endl;
+    }
+
+    for (const auto& contextApp : meAppMap) {
+        const auto& activeApp = contextApp.second;
+        if (activeApp.lifecycle == MecAppLifecycle::ACTIVE &&
+                activeApp.ueAddress == ueAddress &&
+                std::find(appInstanceIds.begin(), appInstanceIds.end(), activeApp.mecAppInstanceId) != appInstanceIds.end() &&
+                tmpMeAppMap.find(activeApp.contextId) != tmpMeAppMap.end()) {
+            deferMigrationRequest(pkt);
+            return;
+        }
+    }
 
     for (const auto& contextApp : meAppMap) {   // for loop on the mecAppMap
         auto oldMecApp = contextApp.second;
-        if (oldMecApp.ueAddress == ueAddress) {    // ue perfomed handover
+        EV << "MecOrchestrator::migrateMecApp - checking contextId=" << contextApp.first
+           << " appInstanceId=" << oldMecApp.mecAppInstanceId
+           << " appUE=" << oldMecApp.ueAddress.str()
+           << " requestedUE=" << ueAddress.str()
+           << " currentMecHost="
+           << (oldMecApp.mecHost != nullptr ? oldMecApp.mecHost->getFullPath() : "<null>")
+           << endl;
+        if (oldMecApp.lifecycle == MecAppLifecycle::ACTIVE &&
+                oldMecApp.ueAddress == ueAddress) {    // ue perfomed handover
             for (auto appInstanceId: appInstanceIds) {  // for loop on app instanceId of mobility-aware meApp found by ams
+                EV << "MecOrchestrator::migrateMecApp - checking requested appInstanceId="
+                   << appInstanceId << " against active instance="
+                   << oldMecApp.mecAppInstanceId << " for contextId="
+                   << oldMecApp.contextId << endl;
                 bool sameCoverageArea = false;
-                if (oldMecApp.mecAppInstanceId.compare(appInstanceId) == 0) {
+                if (oldMecApp.lifecycle == MecAppLifecycle::ACTIVE &&
+                        oldMecApp.mecAppInstanceId.compare(appInstanceId) == 0) {
+                    EV << "MecOrchestrator::migrateMecApp - matched app instance "
+                       << appInstanceId << " for contextId=" << oldMecApp.contextId << endl;
+                    if (tmpMeAppMap.find(oldMecApp.contextId) != tmpMeAppMap.end()) {
+                        deferMigrationRequest(pkt);
+                        return;
+                    }
                     for (auto mecHost: cellToMecHosts[trgCellId]) {
+                        EV << "MecOrchestrator::migrateMecApp - comparing current MEC host "
+                           << (oldMecApp.mecHost != nullptr ? oldMecApp.mecHost->getFullPath() : "<null>")
+                           << " with target-cell MEC host "
+                           << (mecHost != nullptr ? mecHost->getFullPath() : "<null>") << endl;
                         if (oldMecApp.mecHost == mecHost) { // check if the target cell is associated to the source mec host or not
+                            EV << "MecOrchestrator::migrateMecApp - host match: "
+                               << (mecHost != nullptr ? mecHost->getFullPath() : "<null>")
+                               << " serves target cell " << trgCellId
+                               << "; migration will be skipped" << endl;
                             sameCoverageArea = true;
                             break;
                         }
                     }
                     if (!sameCoverageArea) {
+                        EV << "MecOrchestrator::migrateMecApp - current MEC host does not serve target cell "
+                           << trgCellId << "; attempting app migration" << endl;
                         // if the target cell is not associated with the source mec host => do migration
                         int contextId = oldMecApp.contextId;
                         auto it = mecApplicationDescriptors_.find(oldMecApp.appDId);
@@ -507,8 +625,13 @@ void MecOrchestrator::migrateMecApp(cMessage *msg) {
                         cModule *bestHost = mecHostSelectionPolicy_->findBestTargetMecHost(desc, cellToMecHosts[trgCellId]);
 
                         if (bestHost != nullptr) {
+                            int migrationId = nextMigrationId_++;
+                            EV << "MecOrchestrator::migrateMecApp - selected target MEC host "
+                               << bestHost->getFullPath() << " for contextId=" << contextId
+                               << " migrationId=" << migrationId << endl;
                             auto createAppMsg = inet::makeShared<CreateAppMessage>();
                             createAppMsg->setType(MIGRATE_MEAPP);
+                            createAppMsg->setMigrationId(migrationId);
 
                             createAppMsg->setUeAppID(oldMecApp.mecUeAppID);
                             createAppMsg->setMEModuleName(desc.getAppName().c_str());
@@ -531,7 +654,8 @@ void MecOrchestrator::migrateMecApp(cMessage *msg) {
 
                             inet::B msgSize = inet::B(80 + strlen(createAppMsg->getType()) + strlen(createAppMsg->getSourceAddress())
                                     + strlen(createAppMsg->getDestinationAddress()) + strlen(createAppMsg->getDestinationMecAppAddress()) + strlen(createAppMsg->getMEModuleType())
-                                    + strlen(createAppMsg->getMEModuleName()) + strlen(createAppMsg->getRequiredService()) + strlen(createAppMsg->getProvidedService()));
+                                    + strlen(createAppMsg->getMEModuleName()) + strlen(createAppMsg->getRequiredService()) + strlen(createAppMsg->getProvidedService())
+                                    + sizeof(migrationId));
                             createAppMsg->setChunkLength(msgSize);
 
                             // create pkt to send through socket to the mepm on the new mec host
@@ -549,6 +673,9 @@ void MecOrchestrator::migrateMecApp(cMessage *msg) {
                             newMecApp.mecpm = bestHost->getSubmodule("mecPlatformManager");
 
                             newMecApp.mecAppName = desc.getAppName().c_str();
+                            newMecApp.startMigrationTime = mepmMsg->getTimestamp();
+                            newMecApp.migrationId = migrationId;
+                            newMecApp.lifecycle = MecAppLifecycle::MIGRATION_TARGET;
 
                             tmpMeAppMap[contextId] = newMecApp;
 
@@ -561,31 +688,73 @@ void MecOrchestrator::migrateMecApp(cMessage *msg) {
                             socket->send(newPkt);
                         }
                         else {
-                            EV << "MecOrchestrator::migrateMecApp - A suitable MEC host has not been selected, the MECApp cannot be migrated" << endl;
+                            EV << "MecOrchestrator::migrateMecApp - no suitable MEC host selected for target cell "
+                               << trgCellId << "; the MEC app cannot be migrated" << endl;
                         }
                     }
+                    else {
+                        EV << "MecOrchestrator::migrateMecApp - migration skipped: current MEC host "
+                           << (oldMecApp.mecHost != nullptr ? oldMecApp.mecHost->getFullPath() : "<null>")
+                           << " already serves target cell " << trgCellId << endl;
+                    }
+                }
+                else {
+                    EV << "MecOrchestrator::migrateMecApp - app instance mismatch: active="
+                       << oldMecApp.mecAppInstanceId << " requested=" << appInstanceId << endl;
                 }
             }   // end for - appInstanceId
+            EV << "MecOrchestrator::migrateMecApp - finished checking requested app instances for contextId="
+               << oldMecApp.contextId << " (count=" << appInstanceIds.size() << ")" << endl;
         }   // end if - ueAddress
+        else {
+            EV << "MecOrchestrator::migrateMecApp - UE address mismatch for contextId="
+               << contextApp.first << endl;
+        }
     }   // end for - mecAppMapEntry
+    delete pkt;
 }
 
 // app migration after mec host handover
 void MecOrchestrator::migrateMecApps(cMessage *msg) {
     Enter_Method_Silent("MecOrchestrator::migrateMecApps");
 
-    EV << "MecOrchestrator::migrateMecApp" << endl;
+    EV << "MecOrchestrator::migrateMecApps" << endl;
     inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
     auto mepmMsg = pkt->peekAtFront<TriggerMigrationAppMessage>();
     // note: only "UE_IPv4_ADDRESS" type is supported for now
     std::vector<std::string> appInstanceIds = mepmMsg->getAppInstanceIds();
+    const auto contextIds = mepmMsg->getContextIds();
+    if (!contextIds.empty()) {
+        appInstanceIds.clear();
+        for (int contextId : contextIds) {
+            auto activeIt = meAppMap.find(contextId);
+            if (activeIt != meAppMap.end() &&
+                    activeIt->second.lifecycle == MecAppLifecycle::ACTIVE)
+                appInstanceIds.push_back(activeIt->second.mecAppInstanceId);
+        }
+    }
     MacNodeId trgCellId = mepmMsg->getTrgCellId();
+
+    for (const auto& contextApp : meAppMap) {
+        const auto& activeApp = contextApp.second;
+        if (activeApp.lifecycle == MecAppLifecycle::ACTIVE &&
+                std::find(appInstanceIds.begin(), appInstanceIds.end(), activeApp.mecAppInstanceId) != appInstanceIds.end() &&
+                tmpMeAppMap.find(activeApp.contextId) != tmpMeAppMap.end()) {
+            deferMigrationRequest(pkt);
+            return;
+        }
+    }
 
     for (const auto& contextApp : meAppMap) {   // for loop on the mecAppMap
         auto oldMecApp = contextApp.second;
         for (auto appInstanceId: appInstanceIds) {  // for loop on app instances of mobility-aware meApps found by ams
             bool sameCoverageArea = false;
-            if (oldMecApp.mecAppInstanceId.compare(appInstanceId) == 0) {
+            if (oldMecApp.lifecycle == MecAppLifecycle::ACTIVE &&
+                    oldMecApp.mecAppInstanceId.compare(appInstanceId) == 0) {
+                if (tmpMeAppMap.find(oldMecApp.contextId) != tmpMeAppMap.end()) {
+                    deferMigrationRequest(pkt);
+                    return;
+                }
 
                 for (auto mecHost: cellToMecHosts[trgCellId]) {
                     if (oldMecApp.mecHost == mecHost) { // check if the target cell is associated to the source mec host or not
@@ -598,7 +767,7 @@ void MecOrchestrator::migrateMecApps(cMessage *msg) {
                     auto it = mecApplicationDescriptors_.find(oldMecApp.appDId);
                     if (it == mecApplicationDescriptors_.end()) {
                         // this should not happen bc the appDid is in the mecAppMap, so the mecApp is already instantiated at least once
-                        EV << "MecOrchestrator::migrateMecApp - Application package with AppDId[" << oldMecApp.appDId << "] not onboarded." << endl;
+                        EV << "MecOrchestrator::migrateMecApps - Application package with AppDId[" << oldMecApp.appDId << "] not onboarded." << endl;
                         continue;
                     }
                     const ApplicationDescriptor& desc = it->second;
@@ -606,8 +775,10 @@ void MecOrchestrator::migrateMecApps(cMessage *msg) {
                     cModule *bestHost = mecHostSelectionPolicy_->findBestTargetMecHost(desc, cellToMecHosts[trgCellId]);
 
                     if (bestHost != nullptr) {
+                        int migrationId = nextMigrationId_++;
                         auto createAppMsg = inet::makeShared<CreateAppMessage>();
                         createAppMsg->setType(MIGRATE_MEAPP);
+                        createAppMsg->setMigrationId(migrationId);
 
                         createAppMsg->setUeAppID(oldMecApp.mecUeAppID);
                         createAppMsg->setMEModuleName(desc.getAppName().c_str());
@@ -630,7 +801,8 @@ void MecOrchestrator::migrateMecApps(cMessage *msg) {
 
                         inet::B msgSize = inet::B(80 + strlen(createAppMsg->getType()) + strlen(createAppMsg->getSourceAddress())
                                 + strlen(createAppMsg->getDestinationAddress()) + strlen(createAppMsg->getDestinationMecAppAddress()) + strlen(createAppMsg->getMEModuleType())
-                                + strlen(createAppMsg->getMEModuleName()) + strlen(createAppMsg->getRequiredService()) + strlen(createAppMsg->getProvidedService()));
+                                + strlen(createAppMsg->getMEModuleName()) + strlen(createAppMsg->getRequiredService()) + strlen(createAppMsg->getProvidedService())
+                                + sizeof(migrationId));
                         createAppMsg->setChunkLength(msgSize);
 
                         // create pkt to send through socket to the mepm on the new mec host
@@ -650,6 +822,8 @@ void MecOrchestrator::migrateMecApps(cMessage *msg) {
                         newMecApp.mecAppName = desc.getAppName().c_str();
 
                         newMecApp.startMigrationTime = mepmMsg->getTimestamp();
+                        newMecApp.migrationId = migrationId;
+                        newMecApp.lifecycle = MecAppLifecycle::MIGRATION_TARGET;
 
                         tmpMeAppMap[contextId] = newMecApp;
 
@@ -662,12 +836,13 @@ void MecOrchestrator::migrateMecApps(cMessage *msg) {
                         socket->send(newPkt);
                     }
                     else {
-                        EV << "MecOrchestrator::migrateMecApp - A suitable MEC host has not been selected, the MECApp cannot be migrated" << endl;
+                        EV << "MecOrchestrator::migrateMecApps - A suitable MEC host has not been selected, the MECApp cannot be migrated" << endl;
                     }
                 }
             } // end if compare appInstanceId
         }   // end for - appInstanceId
     }   // end for - mecAppMapEntry
+    delete pkt;
 }
 
 void MecOrchestrator::migrateAllMecApps(cMessage *msg) {
@@ -679,12 +854,27 @@ void MecOrchestrator::migrateAllMecApps(cMessage *msg) {
     auto mepmMsg = pkt->peekAtFront<MigrateAppMessage>();
     int mepmId = mepmMsg->getMepmId();
 
+    for (const auto& contextApp : meAppMap) {
+        const auto& activeApp = contextApp.second;
+        if (activeApp.lifecycle == MecAppLifecycle::ACTIVE &&
+                activeApp.mecpm->getId() == mepmId &&
+                tmpMeAppMap.find(activeApp.contextId) != tmpMeAppMap.end()) {
+            deferMigrationRequest(pkt);
+            return;
+        }
+    }
+
     MigrationMecServiceSelectionBased *migrationSelectionPolicy = dynamic_cast<MigrationMecServiceSelectionBased *> (mecHostSelectionPolicy_);
     for (const auto& contextApp : meAppMap) {
-        if (contextApp.second.mecpm->getId() == mepmId) {
+        if (contextApp.second.lifecycle == MecAppLifecycle::ACTIVE &&
+                contextApp.second.mecpm->getId() == mepmId) {
 
             auto oldMecApp = contextApp.second;
             int contextId = oldMecApp.contextId;
+            if (tmpMeAppMap.find(contextId) != tmpMeAppMap.end()) {
+                deferMigrationRequest(pkt);
+                return;
+            }
 
             auto it = mecApplicationDescriptors_.find(oldMecApp.appDId);
             if (it == mecApplicationDescriptors_.end()) {
@@ -699,8 +889,10 @@ void MecOrchestrator::migrateAllMecApps(cMessage *msg) {
             cModule *bestHost = migrationSelectionPolicy->findNewBestMecHost(desc, mecHostName);
 
             if (bestHost != nullptr) {
+                int migrationId = nextMigrationId_++;
                 auto createAppMsg = inet::makeShared<CreateAppMessage>();
                 createAppMsg->setType(MIGRATE_MEAPP);
+                createAppMsg->setMigrationId(migrationId);
 
                 createAppMsg->setUeAppID(oldMecApp.mecUeAppID);
                 createAppMsg->setMEModuleName(desc.getAppName().c_str());
@@ -723,7 +915,8 @@ void MecOrchestrator::migrateAllMecApps(cMessage *msg) {
 
                 inet::B msgSize = inet::B(80 + strlen(createAppMsg->getType()) + strlen(createAppMsg->getSourceAddress())
                         + strlen(createAppMsg->getDestinationAddress()) + strlen(createAppMsg->getDestinationMecAppAddress()) + strlen(createAppMsg->getMEModuleType())
-                        + strlen(createAppMsg->getMEModuleName()) + strlen(createAppMsg->getRequiredService()) + strlen(createAppMsg->getProvidedService()));
+                        + strlen(createAppMsg->getMEModuleName()) + strlen(createAppMsg->getRequiredService()) + strlen(createAppMsg->getProvidedService())
+                        + sizeof(migrationId));
                 createAppMsg->setChunkLength(msgSize);
 
                 // create pkt to send through socket to the mepm on the new mec host
@@ -741,6 +934,8 @@ void MecOrchestrator::migrateAllMecApps(cMessage *msg) {
                 newMecApp.mecpm = bestHost->getSubmodule("mecPlatformManager");
 
                 newMecApp.mecAppName = desc.getAppName().c_str();
+                newMecApp.migrationId = migrationId;
+                newMecApp.lifecycle = MecAppLifecycle::MIGRATION_TARGET;
 
                 tmpMeAppMap[contextId] = newMecApp;
 
@@ -759,6 +954,7 @@ void MecOrchestrator::migrateAllMecApps(cMessage *msg) {
             }
         }
     }
+    delete pkt;
 }
 
 void MecOrchestrator::sendDeleteAppContextAck(bool result, unsigned int requestSno, int contextId)
@@ -779,12 +975,14 @@ void MecOrchestrator::sendCreateAppContextAck(bool result, unsigned int requestS
     ack->setType(ACK_CREATE_CONTEXT_APP);
 
     if (result) {
-        if (meAppMap.empty() || meAppMap.find(contextId) == meAppMap.end()) {
+        auto activeAppIt = meAppMap.find(contextId);
+        if (activeAppIt == meAppMap.end() ||
+                activeAppIt->second.lifecycle != MecAppLifecycle::ACTIVE) {
             EV << "MecOrchestrator::ackMEAppPacket - ERROR meApp[" << contextId << "] does not exist!" << endl;
             return;
         }
 
-        mecAppMapEntry mecAppStatus = meAppMap[contextId];
+        mecAppMapEntry mecAppStatus = activeAppIt->second;
 
         ack->setSuccess(true);
         ack->setContextId(contextId);
@@ -810,22 +1008,46 @@ void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
     inet::Packet *pkt = check_and_cast<inet::Packet *>(msg);
     auto mepmMsg = pkt->peekAtFront<MigrateAppAckMessage>();
     int contextId = mepmMsg->getContextId();
-    EV << "MecOrchestrator::handleMigrateAppAck - processing contextId: " << contextId << endl;
-    // Checking if contextId To tmpMeAppMapKey entry map does exist
-    if (tmpMeAppMap.empty() || (tmpMeAppMap.find(contextId) == tmpMeAppMap.end())) {
-        // Maybe it has already been migrated
-        EV << "MecOrchestrator::handleMigrateAppAck - \tWARNING MEC Application [" << contextId << "] not found!" << endl;
-//        sendDeleteAppContextAck(false, contAppMsg->getRequestId(), contextId);
+    int migrationId = mepmMsg->getMigrationId();
+    EV << "MecOrchestrator::handleMigrateAppAck - processing contextId: " << contextId
+       << " migrationId: " << migrationId << endl;
+    auto tmpIt = tmpMeAppMap.find(contextId);
+    if (tmpIt == tmpMeAppMap.end()) {
+        EV_WARN << "MecOrchestrator::handleMigrateAppAck - no migration target found for contextId="
+                << contextId << " migrationId=" << migrationId << endl;
+        delete pkt;
         return;
     }
-    auto tmpMecApp = tmpMeAppMap[contextId];
+    if (tmpIt->second.migrationId != migrationId) {
+        EV_WARN << "MecOrchestrator::handleMigrateAppAck - stale ACK: expected migrationId="
+                << tmpIt->second.migrationId << " but received " << migrationId << endl;
+        delete pkt;
+        return;
+    }
+
+    auto tmpMecApp = tmpIt->second;
     double processingTime = 0.0;
+
+    if (!mepmMsg->getStatus()) {
+        EV_ERROR << "MecOrchestrator::handleMigrateAppAck - target instantiation failed for contextId="
+                 << contextId << " migrationId=" << migrationId << endl;
+        MECOrchestratorMessage *meoMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
+        meoMsg->setType(MIGRATE_CONTEXT_APP);
+        meoMsg->setContextId(contextId);
+        meoMsg->setMigrationId(migrationId);
+        meoMsg->setRequestId(tmpMecApp.mecUeAppID);
+        meoMsg->setSuccess(false);
+        scheduleAt(simTime() + instantiationTime, meoMsg);
+        delete pkt;
+        return;
+    }
 
     auto it = mecApplicationDescriptors_.find(tmpMecApp.appDId);
     if (it == mecApplicationDescriptors_.end()) {
-        // this should not happen bc the appDId is in the mecAppMap, so the mecApp is already instantiated at least once
-        EV << "MecOrchestrator::handleMigrateAppAck - Application package with AppDId[" << tmpMecApp.appDId << "] not onboarded." << endl;
-
+        // this should not happen bc the appDid is in the mecAppMap, so the mecApp is already instantiated at least once
+        EV_ERROR << "MecOrchestrator::handleMigrateAppAck - Application package with AppDId["
+                 << tmpMecApp.appDId << "] not onboarded." << endl;
+        delete pkt;
         return;
     }
 
@@ -854,19 +1076,6 @@ void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
          tmpMecApp.isEmulated = false;
      }
 
-     if (!appInfo->status) {
-        EV << "MecOrchestrator::handleMigrateAppAck - something went wrong during MEC app instantiation" << endl;
-         MECOrchestratorMessage *meoMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
-         meoMsg->setType(MIGRATE_CONTEXT_APP);
-         // requestId field used to send the ueAppID of interest to UALCMP
-         meoMsg->setRequestId(tmpMecApp.mecUeAppID);
-         meoMsg->setSuccess(false);
-         processingTime += instantiationTime;
-         scheduleAt(simTime() + processingTime, meoMsg);
-
-         return;
-     }
-
      delete pkt;
 
      EV << "MecOrchestrator::handleMigrateAppAck - new MEC application with name: " << appInfo->instanceId << " instantiated on MEC host [" << tmpMecApp.mecHost << "] at " << appInfo->endPoint.addr.str() << ":" << appInfo->endPoint.port << endl;
@@ -876,10 +1085,11 @@ void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
      tmpMecApp.mecAppInstanceId = appInfo->instanceId;
      tmpMecApp.contextId = contextId;
      tmpMecApp.reference = appInfo->reference;
-     tmpMeAppMap[contextId] = tmpMecApp;
+     tmpIt->second = tmpMecApp;
 
      MECOrchestratorMessage *meoMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
      meoMsg->setContextId(contextId);
+     meoMsg->setMigrationId(migrationId);
      meoMsg->setType(MIGRATE_CONTEXT_APP);
      // requestId field used to send the ueAppID of interest to UALCMP
      meoMsg->setRequestId(tmpMecApp.mecUeAppID);
@@ -892,21 +1102,45 @@ void MecOrchestrator::handleMigrateAppAck(cMessage *msg)
 
 }
 
-void MecOrchestrator::sendMigrateAppContext(bool result, int ueAppId, int contextId) {
-    EV << "MecOrchestrator::sendMigrateAppContext - result: " << result << " reqSno: " << ueAppId << " contextId: " << contextId << endl;
-    if (!result) {
-        EV << "MecOrchestrator::sendMigrateAppContext - App NOT migrated" << endl;
+void MecOrchestrator::sendMigrateAppContext(bool result, int ueAppId, int contextId, int migrationId) {
+    EV << "MecOrchestrator::sendMigrateAppContext - result: " << result << " reqSno: "
+       << ueAppId << " contextId: " << contextId << " migrationId: " << migrationId << endl;
+    auto targetIt = tmpMeAppMap.find(contextId);
+    if (targetIt == tmpMeAppMap.end() || targetIt->second.migrationId != migrationId) {
+        EV_ERROR << "MecOrchestrator::sendMigrateAppContext - no matching staged target for contextId="
+                 << contextId << " migrationId=" << migrationId << endl;
         return;
     }
+
+    if (!result) {
+        EV << "MecOrchestrator::sendMigrateAppContext - App NOT migrated" << endl;
+        tmpMeAppMap.erase(targetIt);
+        return;
+    }
+
+    auto sourceIt = meAppMap.find(contextId);
+    if (sourceIt == meAppMap.end() ||
+            sourceIt->second.lifecycle != MecAppLifecycle::ACTIVE) {
+        EV_ERROR << "MecOrchestrator::sendMigrateAppContext - no active source instance for contextId="
+                 << contextId << "; cannot promote migration target" << endl;
+        return;
+    }
+    if (pendingDeleteMeApps.find(migrationId) != pendingDeleteMeApps.end()) {
+        throw cRuntimeError("MecOrchestrator::sendMigrateAppContext - duplicate migrationId %d", migrationId);
+    }
+
+    mecAppMapEntry oldMecApp = sourceIt->second;
+    oldMecApp.lifecycle = MecAppLifecycle::SOURCE_PENDING_DELETE;
+    pendingDeleteMeApps.emplace(migrationId, oldMecApp);
+
+    mecAppMapEntry newMecApp = targetIt->second;
+    newMecApp.lifecycle = MecAppLifecycle::ACTIVE;
+    meAppMap[contextId] = newMecApp;
+    tmpMeAppMap.erase(targetIt);
 
     MigrateContextAppMessage *migrateMsg = new MigrateContextAppMessage();
     migrateMsg->setType(MIGRATE_CONTEXT_APP);
-    if (tmpMeAppMap.empty() || tmpMeAppMap.find(contextId) == tmpMeAppMap.end()) {
-        EV << "MecOrchestrator::ackMEAppPacket - ERROR meApp[" << contextId << "] does not exist!" << endl;
-        return;
-    }
-
-    mecAppMapEntry mecAppStatus = tmpMeAppMap[contextId];
+    mecAppMapEntry mecAppStatus = newMecApp;
 
     migrateMsg->setStartMigrationTime(mecAppStatus.startMigrationTime);
     migrateMsg->setStopMigrationTime(simTime());
@@ -925,7 +1159,8 @@ void MecOrchestrator::sendMigrateAppContext(bool result, int ueAppId, int contex
     MECOrchestratorMessage *deleteAppMsg = new MECOrchestratorMessage("MECOrchestratorMessage");
     deleteAppMsg->setType(STOP_MIGRATED_INSTANCE_APP);
     deleteAppMsg->setContextId(contextId);
-    deleteAppMsg->setRequestId(meAppMap[contextId].mecUeAppID);
+    deleteAppMsg->setMigrationId(migrationId);
+    deleteAppMsg->setRequestId(oldMecApp.mecUeAppID);
     deleteAppMsg->setSuccess(true);
 
     double processingTime = removalWaitingTime + terminationTime;

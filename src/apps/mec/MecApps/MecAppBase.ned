@@ -27,6 +27,8 @@ simple MecAppBase like IMECApp, IApp
         // param for configuring the mobility level of the mec app in case it is subjet to migration procedures
         string appMobilityLevel = default("APP_MOBILITY_NOT_ALLOWED");	// {APP_MOBILITY_NOT_ALLOWED, APP_MOBILITY_WITH_CONFIRMATION, APP_MOBILITY_WITHOUT_CONFIRMATION}
         int mecAppId;      // will be assigned by the VIM upon Mec App instantiation
+        int migrationId = default(-1);
+        int contextId = default(-1);
 
         string mp1Address = default("");
         int mp1Port = default(10021);
@@ -53,4 +55,3 @@ simple MecAppBase like IMECApp, IApp
         input socketIn @labels(TcpCommand/up);
         output socketOut @labels(TcpCommand/down);
 }
-

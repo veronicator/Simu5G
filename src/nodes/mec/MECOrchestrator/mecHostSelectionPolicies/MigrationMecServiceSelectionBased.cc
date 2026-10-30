@@ -133,7 +133,7 @@ cModule *MigrationMecServiceSelectionBased::findBestTargetMecHost(const Applicat
         bool found = false;
 
         for (auto mecHost : eligibleTargetMecHosts) {
-            EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - MEC host [" << mecHost->getName() << "] size of mecHost " << eligibleTargetMecHosts.size() << endl;
+            EV << "MigrationMecServiceSelectionBased::findBestTargetMecHost - MEC host [" << mecHost->getName() << "] size of mecHost list" << eligibleTargetMecHosts.size() << endl;
             VirtualisationInfrastructureManager *vim = check_and_cast<VirtualisationInfrastructureManager *>(mecHost->getSubmodule("vim"));
             ResourceDescriptor resources = appDesc.getVirtualResources();
             bool res = vim->isAllocable(resources.ram, resources.disk, resources.cpu);
