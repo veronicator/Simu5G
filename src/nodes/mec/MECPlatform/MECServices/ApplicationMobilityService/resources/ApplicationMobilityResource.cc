@@ -294,4 +294,14 @@ std::vector<int> ApplicationMobilityResource::getContextIdsFromMecHostAddress(
     return contextIds;
 }
 
+bool ApplicationMobilityResource::hasRegistrationInfoForContext(int contextId) const
+{
+    for (const auto& consumer : serviceConsumers_) {
+        if (consumer.second != nullptr && consumer.second->getContextId() == contextId)
+            return true;
+    }
+
+    return false;
+}
+
 }   // namespace

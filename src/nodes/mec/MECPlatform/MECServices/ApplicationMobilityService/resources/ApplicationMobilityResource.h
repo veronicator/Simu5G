@@ -80,6 +80,7 @@ class ApplicationMobilityResource : public AttributeBase {
 
     std::vector<std::string> getAppInstanceIdsFromMecHostAddress(std::string mecHostAddr);
     std::vector<int> getContextIdsFromMecHostAddress(const std::string& mecHostAddr) const;
+    bool hasRegistrationInfoForContext(int contextId) const;
 };
 
 }   // namespace

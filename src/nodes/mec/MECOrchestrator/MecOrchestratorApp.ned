@@ -43,6 +43,9 @@ simple MecOrchestratorApp
         double terminationTime @unit(s) = default(50ms);
         double removalWaitingTime @unit(s) = default(20s);
 
+        @signal[uplinkMigrationTime];
+        @statistic[uplinkMigrationTime](title="Uplink migration trigger time: mobility notification reception at AMS to trigger reception at MEO"; unit="s"; source="uplinkMigrationTime"; record=mean,vector);
+
     gates:
         output socketOut;
         input socketIn;

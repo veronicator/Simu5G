@@ -159,7 +159,8 @@ bool MecPlatformManager::terminateMEApp(DeleteAppMessage *msg)
     return res;
 }
 
-void MecPlatformManager::triggerMecAppMigration(simtime_t startMigration, AssociateId associateId, std::vector<int> contextIds, MacNodeId srcEcgi, MacNodeId trgEcgi) {
+void MecPlatformManager::triggerMecAppMigration(simtime_t startMigration, simtime_t notificationTimestamp,
+        AssociateId associateId, std::vector<int> contextIds, MacNodeId srcEcgi, MacNodeId trgEcgi) {
 
     Enter_Method_Silent("MecPlatformManager::triggerMecAppMigration");
 
@@ -169,11 +170,12 @@ void MecPlatformManager::triggerMecAppMigration(simtime_t startMigration, Associ
     auto migrateMsg = inet::makeShared<TriggerMigrationAppMessage>();
     migrateMsg->setType(MIGRATE_MEAPP);
     migrateMsg->setTimestamp(startMigration);
+    migrateMsg->setNotificationTimestamp(notificationTimestamp);
     migrateMsg->setAssociateId(associateId);
     migrateMsg->setContextIds(contextIds);
     migrateMsg->setSrcCellId(srcEcgi);
     migrateMsg->setTrgCellId(trgEcgi);
-    inet::B msgSize = inet::B(40 + strlen(migrateMsg->getType()) + strlen(associateId.getType().c_str()) + strlen(associateId.getValue().c_str())
+    inet::B msgSize = inet::B(40 + sizeof(simtime_t) + strlen(migrateMsg->getType()) + strlen(associateId.getType().c_str()) + strlen(associateId.getValue().c_str())
             + contextIds.size() * sizeof(int));
     migrateMsg->setChunkLength(msgSize);
 
@@ -181,7 +183,7 @@ void MecPlatformManager::triggerMecAppMigration(simtime_t startMigration, Associ
     meoSocket_.send(newPkt);
 }
 
-void MecPlatformManager::triggerMecAppsMigration(simtime_t startMigration, std::vector<int> contextIds, MacNodeId trgEcgi) {
+void MecPlatformManager::triggerMecAppsMigration(simtime_t startMigration, simtime_t notificationTimestamp, std::vector<int> contextIds, MacNodeId trgEcgi) {
 
     Enter_Method_Silent("MecPlatformManager::triggerMecAppsMigration");
 
@@ -191,11 +193,12 @@ void MecPlatformManager::triggerMecAppsMigration(simtime_t startMigration, std::
     auto migrateMsg = inet::makeShared<TriggerMigrationAppMessage>();
     migrateMsg->setType(MIGRATE_MEAPPS);
     migrateMsg->setTimestamp(startMigration);
+    migrateMsg->setNotificationTimestamp(notificationTimestamp);
     migrateMsg->setContextIds(contextIds);
     migrateMsg->setTrgCellId(trgEcgi);
     const int vecSize = contextIds.size() * sizeof(int);
 
-    inet::B msgSize = inet::B(48 + strlen(migrateMsg->getType()) + vecSize);
+    inet::B msgSize = inet::B(48 + sizeof(simtime_t) + strlen(migrateMsg->getType()) + vecSize);
     migrateMsg->setChunkLength(msgSize);
 
     std::cout << "\nmepm::triggerMecAppsMigration -> contextIds size: " << contextIds.size() << endl;

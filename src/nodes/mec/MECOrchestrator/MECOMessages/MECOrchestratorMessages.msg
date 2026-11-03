@@ -151,6 +151,7 @@ class MigrateAppAckMessage extends MECMessage {
 
 class TriggerMigrationAppMessage extends MECMessage {
     // msg type: MIGRATE_MEAPP
+    simtime_t notificationTimestamp;
    	
    	AssociateId associateId;	// type, value
    	AppInstanceIdVector appInstanceIds;	//mec app instance to migrate

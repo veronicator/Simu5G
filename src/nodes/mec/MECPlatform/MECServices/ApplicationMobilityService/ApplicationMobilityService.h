@@ -66,6 +66,7 @@ class ApplicationMobilityService : public MecServiceBase2
 
   double waitingTimeTriggerMigration_;
   std::map<std::string, std::vector<int>> pendingContextIdsByHost_;
+  std::map<int, MacNodeId> latestUeTargetCellByContext_;
 
   int migrationCounter_;
   simsignal_t totalMigrationsSignal_;

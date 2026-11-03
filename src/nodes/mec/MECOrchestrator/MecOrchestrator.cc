@@ -66,6 +66,7 @@ void MecOrchestrator::initialize(int stage)
         instantiationTime = par("instantiationTime").doubleValue();
         terminationTime = par("terminationTime").doubleValue();
         removalWaitingTime = par("removalWaitingTime").doubleValue();
+        uplinkMigrationTimeSignal_ = registerSignal("uplinkMigrationTime");
 
         getConnectedMecHosts();
         onboardApplicationPackages();
@@ -198,11 +199,22 @@ void MecOrchestrator::socketDataArrived(inet::TcpSocket *socket, inet::Packet *m
                 migrateAllMecApps(new Packet("MigrateAppMessage", mepmMsg));
             }
 
-            else if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPP))
+            else if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPP)) {
+                auto triggerMsg = inet::dynamicPtrCast<const TriggerMigrationAppMessage>(mepmMsg);
+                if (triggerMsg == nullptr)
+                    throw cRuntimeError("MecOrchestrator::socketDataArrived - invalid MIGRATE_MEAPP message");
+//                emit(uplinkMigrationTimeSignal_,
+//                        simTime() - triggerMsg->getNotificationTimestamp());
                 migrateMecApp(new Packet("TriggerMigrateAppMessage", mepmMsg));
-
-            else if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPPS))
+            }
+            else if (!strcmp(mepmMsg->getType(), MIGRATE_MEAPPS)) {
+                auto triggerMsg = inet::dynamicPtrCast<const TriggerMigrationAppMessage>(mepmMsg);
+                if (triggerMsg == nullptr)
+                    throw cRuntimeError("MecOrchestrator::socketDataArrived - invalid MIGRATE_MEAPPS message");
+                emit(uplinkMigrationTimeSignal_,
+                        simTime() - triggerMsg->getNotificationTimestamp());
                 migrateMecApps(new Packet("TriggerMigrateAppMessage", mepmMsg));
+            }
 
             else if (!strcmp(mepmMsg->getType(), ACK_MIGRATE_MEAPP))
                 handleMigrateAppAck(new Packet("MigrateAppAckMessage", mepmMsg));

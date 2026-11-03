@@ -27,12 +27,15 @@ class TimerMigrationTriggerMessage : public cMessage {
 public:
     simtime_t arrivalNotificationTime;
     std::string mecHostAddress;
+    std::string mecHostName;
     MacNodeId srcCellId;
 
-    TimerMigrationTriggerMessage(simtime_t time, std::string hostAddress, MacNodeId cellId)
+    TimerMigrationTriggerMessage(simtime_t time, std::string hostAddress,
+            std::string hostName, MacNodeId cellId)
         : cMessage("timerTriggerAppMigration"),
           arrivalNotificationTime(time),
           mecHostAddress(std::move(hostAddress)),
+          mecHostName(std::move(hostName)),
           srcCellId(cellId)
     {
     }
@@ -165,11 +168,29 @@ void ApplicationMobilityService::handleMessage(cMessage *msg)
                 if (pending != pendingContextIdsByHost_.end()) {
                     std::vector<int> contextIds = std::move(pending->second);
                     pendingContextIdsByHost_.erase(pending);
-                    if (!contextIds.empty())
-                        mecPlatformManager_->triggerMecAppsMigration(simTime(), contextIds, migration->srcCellId);
+                    std::vector<int> contextIdsToMigrate;
+                    for (int contextId : contextIds) {
+                        auto ueTargetCell = latestUeTargetCellByContext_.find(contextId);
+                        if (ueTargetCell != latestUeTargetCellByContext_.end() &&
+                                mecPlatformManager_->isMecHostServingCell(
+                                        migration->mecHostName, ueTargetCell->second)) {
+                            EV << "AMS::host " << migration->mecHostName
+                               << " now serves the latest UE target cell "
+                               << ueTargetCell->second << "; keeping contextId="
+                               << contextId << " on its current host" << endl;
+                            continue;
+                        }
+
+                        contextIdsToMigrate.push_back(contextId);
+                    }
+
+                    if (!contextIdsToMigrate.empty())
+                        mecPlatformManager_->triggerMecAppsMigration(
+                                simTime(), migration->arrivalNotificationTime,
+                                contextIdsToMigrate, migration->srcCellId);
                     else
-                        EV << "AMS::no app contexts remain to migrate for MEC host "
-                           << migration->mecHostAddress << endl;
+                        EV << "AMS::no app contexts need migration for MEC host "
+                           << migration->mecHostName << endl;
                 }
                 else {
                     EV_WARN << "AMS::no pending app contexts for MEC host "
@@ -488,6 +509,7 @@ void ApplicationMobilityService::handleDELETERequest(const HttpRequestMessage *c
         EV << "AMS::Delete registration info " <<  endl;
         uri.erase(0, uri.find(baseUriServiceRegistration_ + "/") + baseUriServiceRegistration_.length() + 1);
         RegistrationInfo *regInfo = registrationResources_->getRegistrationInfoFromAppMobilityServiceId(uri);
+        const int contextId = regInfo != nullptr ? regInfo->getContextId() : -1;
         if (regInfo != nullptr) {
             if (regInfo->isMobileMecHost()){
                 // unsubscribe to HostMobilityService notifications
@@ -519,6 +541,9 @@ void ApplicationMobilityService::handleDELETERequest(const HttpRequestMessage *c
         }
         else
         {
+            if (contextId >= 0 && !registrationResources_->hasRegistrationInfoForContext(contextId))
+                latestUeTargetCellByContext_.erase(contextId);
+
             Http::send204Response(socket);
 
             EV << "AMS send 204 response socket: " << socket->getState() << endl;
@@ -899,7 +924,8 @@ void ApplicationMobilityService::handleHostMobilityNotification(const nlohmann::
 
         pendingContextIdsByHost_[servingHostAddress] =
             registrationResources_->getContextIdsFromMecHostAddress(servingHostAddress);
-        cMessage *m = new TimerMigrationTriggerMessage(arrivalHmsNotificationTime, std::move(servingHostAddress), srcCellId);
+        cMessage *m = new TimerMigrationTriggerMessage(arrivalHmsNotificationTime,
+                std::move(servingHostAddress), std::move(servingHostName), srcCellId);
         scheduleAt(simTime() + waitingTimeTriggerMigration_, m);
 
     }
@@ -914,6 +940,7 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
     CellChangeNotification *cellChangeNotification = new CellChangeNotification();
     bool res = cellChangeNotification->fromJson(request);
     if (res) {
+        const simtime_t notificationTimestamp = simTime();
         EV << "Cell Change Notification processed: " << cellChangeNotification->toJson() << endl;
         auto associateIds = cellChangeNotification->getAssociateId();
 
@@ -963,6 +990,8 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
                             registeredAssociateId.getValue() != ueAssociateId.getValue())
                         continue;
 
+                    latestUeTargetCellByContext_[contextId] = trgEcgi.getCellId();
+
                     if (hostAlreadyServesTarget)
                         continue;
 
@@ -989,9 +1018,8 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
             if (!migratableContextIds.empty()) {
                 EV << "AMS::CellChangeNotification - trigger migration for "
                    << migratableContextIds.size() << " app context(s)" << endl;
-                mecPlatformManager_->triggerMecAppMigration(simTime(),
-                    ueAssociateId, migratableContextIds,
-                    srcEcgi.getCellId(), trgEcgi.getCellId());
+                mecPlatformManager_->triggerMecAppMigration(simTime(), notificationTimestamp,
+                    ueAssociateId, migratableContextIds, srcEcgi.getCellId(), trgEcgi.getCellId());
             }
         }
     }

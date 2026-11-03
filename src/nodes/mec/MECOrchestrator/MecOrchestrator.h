@@ -125,6 +125,7 @@ class MecOrchestrator : public cSimpleModule, public inet::TcpSocket::ICallback
     double instantiationTime;
     double terminationTime;
     double removalWaitingTime;
+    simsignal_t uplinkMigrationTimeSignal_;
 
   public:
     const ApplicationDescriptor *getApplicationDescriptorByAppName(const std::string& appName) const;
