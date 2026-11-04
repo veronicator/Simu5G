@@ -31,6 +31,8 @@ network appMigration_mobileMECHost
         int numUes = default(1);
         int numBgCells = default(0);
 
+        bool isStatic = default(false);
+
     types:
         channel C extends DatarateChannel
         {
@@ -82,6 +84,9 @@ network appMigration_mobileMECHost
         mobileMecHost2: MobileHostNode {
             @display("p=287,351");
         }
+        mecHostStatic: MECHost if isStatic {
+            @display("p=1104,211");
+        }
         mecOrchestrator: MecOrchestrator {
             @display("p=835,35");
         }
@@ -121,6 +126,8 @@ network appMigration_mobileMECHost
         ualcmp.fromMecOrchestrator <-- mecOrchestrator.toUALCMP;
 
         mecOrchestrator.ppp++ <--> Eth10G <--> router.pppg++;
+
+        mecHostStatic.ppp++ <--> Eth10G <--> iUpf2.filterGate if isStatic;
 
         //# X2 connections
         gnb1.x2++ <--> Eth10G <--> gnb2.x2++;
