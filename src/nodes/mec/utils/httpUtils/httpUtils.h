@@ -115,12 +115,12 @@ void addBodyChunk(std::string& data, HttpBaseMessage *httpMessage);
 bool parseReceivedMsg(const std::string& inPacket, std::string& storedData, HttpBaseMessage *& currentHttpMessage);
 
 /*
- *  WARNING: This function is not used in our scenarios, so it is not fully tested
- *
  * This function parses an incoming message by calling the above functions,
  * i.e. parseHeader and parseTcpData (as the parseReceivedMsg above), with the
- * addition of the management of TCP segments containing more than one HTTP message.
- * Every completed HTTP message is queued in the messageQueue.
+ * addition of support for TCP segments containing more than one HTTP message.
+ * Each completed HTTP message is queued in messageQueue. This function is used
+ * by MEC applications, but handling of multiple messages in one segment has
+ * limited test coverage.
  *
  * @param socketId needed to know to whom to send back the response
  * @param inPacket raw bytes as string of the incoming message

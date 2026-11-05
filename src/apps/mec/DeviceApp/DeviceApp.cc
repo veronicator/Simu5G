@@ -36,6 +36,9 @@ Define_Module(DeviceApp);
 DeviceApp::~DeviceApp()
 {
     cancelAndDelete(processedUALCMPMessage);
+    delete UALCMPMessage;
+    while (!UALCMPMessageQueue.isEmpty())
+        delete UALCMPMessageQueue.pop();
 }
 
 void DeviceApp::handleUALCMPMessage()
@@ -385,10 +388,19 @@ void DeviceApp::handleSelfMessage(cMessage *msg) {
         delete msg;
     }
     else if (strcmp(msg->getName(), "processedUALCMPMessage") == 0) {
+        if (UALCMPMessage == nullptr) {
+            if (UALCMPMessageQueue.isEmpty())
+                throw cRuntimeError("DeviceApp::handleSelfMessage - no UALCMP message to process");
+            UALCMPMessage = check_and_cast<HttpBaseMessage *>(UALCMPMessageQueue.pop());
+        }
         handleUALCMPMessage();
         if (UALCMPMessage != nullptr)
             delete UALCMPMessage;
         UALCMPMessage = nullptr;
+        if (!UALCMPMessageQueue.isEmpty()) {
+            double time = 0.005; // TODO make parametric
+            scheduleAt(simTime() + time, processedUALCMPMessage);
+        }
     }
 }
 
@@ -600,12 +612,12 @@ void DeviceApp::socketDataArrived(inet::TcpSocket *socket, inet::Packet *msg, bo
 
     delete msg;
 
-    bool res = Http::parseReceivedMsg(packet, UALCMPMessageBuffer, UALCMPMessage);
-    if (res) {
+    bool res = Http::parseReceivedMsg(ualcmpSocket_.getSocketId(), packet, UALCMPMessageQueue, UALCMPMessageBuffer, UALCMPMessage);
+    if (res && !UALCMPMessageQueue.isEmpty()) {
         double time = 0.005; // TODO make parametric
         EV_INFO << "DeviceApp::socketDataArrived - packet will be processed in " << time << " seconds" << endl;
-        UALCMPMessage->setSockId(ualcmpSocket_.getSocketId());
-        scheduleAt(simTime() + time, processedUALCMPMessage);
+        if (!processedUALCMPMessage->isScheduled())
+            scheduleAt(simTime() + time, processedUALCMPMessage);
     }
 }
 
@@ -633,4 +645,3 @@ void DeviceApp::finish()
 }
 
 } //namespace
-

@@ -60,6 +60,7 @@ class DeviceApp : public cSimpleModule, public inet::TcpSocket::ICallback, publi
 
     HttpBaseMessage *UALCMPMessage = nullptr;
     std::string UALCMPMessageBuffer;
+    cQueue UALCMPMessageQueue;
 
     cMessage *processedUALCMPMessage = nullptr;
 
@@ -113,4 +114,3 @@ class DeviceApp : public cSimpleModule, public inet::TcpSocket::ICallback, publi
 } //namespace
 
 #endif /* APPS_MEC_MEAPPS_DEVICEAPP_H_ */
-
