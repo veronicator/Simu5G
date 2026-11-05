@@ -964,26 +964,6 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
                 if (contextId < 0)
                     continue;
 
-                auto pending = pendingContextIdsByHost_.find(regInfo->getMecHostAddress());
-                bool pendingHostMigration = false;
-                bool hostAlreadyServesTarget = false;
-                if (pending != pendingContextIdsByHost_.end()) {
-                    auto& pendingIds = pending->second;
-                    pendingHostMigration =
-                        std::find(pendingIds.begin(), pendingIds.end(), contextId) != pendingIds.end();
-                    if (pendingHostMigration) {
-                        hostAlreadyServesTarget = mecPlatformManager_->isMecHostServingCell(
-                                regInfo->getMecHostName(), trgEcgi.getCellId());
-                        if (hostAlreadyServesTarget) {
-                            pendingIds.erase(std::remove(pendingIds.begin(), pendingIds.end(), contextId),
-                                    pendingIds.end());
-                            EV << "AMS::CellChangeNotification - contextId=" << contextId
-                               << " removed from pending host migration; current MEC host serves target cell"
-                               << endl;
-                        }
-                    }
-                }
-
                 for (const auto& devInfo : regInfo->getDeviceInformation()) {
                     const auto& registeredAssociateId = devInfo.getAssociateId();
                     if (registeredAssociateId.getType() != ueAssociateId.getType() ||
@@ -992,8 +972,32 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
 
                     latestUeTargetCellByContext_[contextId] = trgEcgi.getCellId();
 
-                    if (hostAlreadyServesTarget)
+                    auto pending = pendingContextIdsByHost_.find(regInfo->getMecHostAddress());
+                    bool pendingHostMigration = false;
+                    if (pending != pendingContextIdsByHost_.end()) {
+                        const auto& pendingIds = pending->second;
+                        pendingHostMigration =
+                            std::find(pendingIds.begin(), pendingIds.end(), contextId) != pendingIds.end();
+                    }
+
+                    // The MEO may already have applied the host's serving-area update
+                    // before its HMS notification reaches the AMS.
+                    const bool hostAlreadyServesTarget =
+                        mecPlatformManager_->isMecHostServingCell(
+                            regInfo->getMecHostName(), trgEcgi.getCellId());
+                    if (hostAlreadyServesTarget) {
+                        if (pendingHostMigration) {
+                            auto& pendingIds = pending->second;
+                            pendingIds.erase(
+                                std::remove(pendingIds.begin(), pendingIds.end(), contextId),
+                                pendingIds.end());
+                        }
+                        EV << "AMS::CellChangeNotification - current MEC host "
+                           << regInfo->getMecHostName() << " serves target cell "
+                           << trgEcgi.getCellId() << "; no UE app migration needed for contextId="
+                           << contextId << endl;
                         continue;
+                    }
 
                     if (devInfo.getAppMobilityServiceLevelString() == "APP_MOBILITY_NOT_ALLOWED") {
                         EV << "AMS::CellChangeNotification - APP_MOBILITY_NOT_ALLOWED" << endl;
@@ -1002,11 +1006,11 @@ void ApplicationMobilityService::handleCellChangeNotification(const nlohmann::or
 
                     if (pendingHostMigration) {
                         auto& pendingIds = pending->second;
-                        pendingIds.erase(std::remove(pendingIds.begin(), pendingIds.end(), contextId),
-                                pendingIds.end());
+                        pendingIds.erase(
+                            std::remove(pendingIds.begin(), pendingIds.end(), contextId),
+                            pendingIds.end());
                         EV << "AMS::CellChangeNotification - contextId=" << contextId
                            << " removed from pending host migration; issuing UE-specific migration" << endl;
-                        pendingHostMigration = false;
                     }
 
                     if (std::find(migratableContextIds.begin(), migratableContextIds.end(), contextId) ==
