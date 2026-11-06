@@ -31,6 +31,7 @@ network appMigration_mobileMECHost
         int numUes = default(1);
         int numBgCells = default(0);
 
+        bool isMobile = default(true);
         bool isStatic = default(false);
 
     types:
@@ -78,10 +79,10 @@ network appMigration_mobileMECHost
         }
 
         // MEC modules
-        mobileMecHost1: MobileHostNode {
+        mobileMecHost1: MobileHostNode if isMobile {
             @display("p=315,695");
         }
-        mobileMecHost2: MobileHostNode {
+        mobileMecHost2: MobileHostNode if isMobile {
             @display("p=287,351");
         }
         mecHostStatic: MECHost if isStatic {
