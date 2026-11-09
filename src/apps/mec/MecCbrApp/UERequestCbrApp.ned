@@ -65,7 +65,7 @@ simple UERequestCbrApp like IApp
         @statistic[instantiationTime](title="appInstantiationTime"; unit="s"; source="instantiationTime"; record=stats,mean);
 
         @signal[migrationTime];
-        @statistic[migrationTime](title="appMigrationTime"; unit="s"; source="migrationTime"; record=last,mean);
+        @statistic[migrationTime](title="appMigrationTime"; unit="s"; source="migrationTime"; record=last,mean,count);
 
         @signal[migrationTimeTotal];
         @statistic[migrationTimeTotal](title="appMigrationTimeTotal"; unit="s"; source="migrationTimeTotal"; record=last,mean);
